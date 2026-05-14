@@ -105,14 +105,19 @@ def _classify_solids(doc):
 
 
 def _link_origin_in_world(link_name):
-    """Joint origin in CAD/IK frame for the link."""
+    """Joint origin in CAD frame for the link.
+
+    CAD X axis is FLIPPED relative to IK X (CAD front is at small X, IK +X = front).
+    So when applying IK-frame offsets, we negate X.
+    """
     if link_name == "base_link":
         return BODY_CENTER_CAD
 
     parts = link_name.split("_")
     corner, seg = parts[0], parts[1]
     side = corner[1]
-    hip_world = BODY_CENTER_CAD + HIP_OFFSETS_IK[corner]
+    ik_offset = HIP_OFFSETS_IK[corner]
+    hip_world = BODY_CENTER_CAD + FreeCAD.Vector(-ik_offset.x, ik_offset.y, ik_offset.z)
     if seg == "hip":
         return hip_world
     thigh_world = hip_world + thigh_offset_from_hip_ik(side)
@@ -128,12 +133,18 @@ def _link_origin_in_world(link_name):
 
 
 def _link_transform(origin_world):
-    """Return placement matrix: translate so origin_world→0, then swap Y↔Z."""
+    """CAD → URDF transform: flip X, swap Y↔Z, translate origin_world → (0,0,0).
+
+    Mapping per axis:
+      urdf_x = -(cad_x - origin.x) = origin.x - cad_x   (CAD X is reversed)
+      urdf_y = cad_z - origin.z                          (CAD Z = URDF Y left)
+      urdf_z = cad_y - origin.y                          (CAD Y = URDF Z up)
+    """
     matrix = FreeCAD.Matrix()
-    matrix.A11 = 1; matrix.A12 = 0; matrix.A13 = 0; matrix.A14 = -origin_world.x
-    matrix.A21 = 0; matrix.A22 = 0; matrix.A23 = 1; matrix.A24 = -origin_world.z
-    matrix.A31 = 0; matrix.A32 = 1; matrix.A33 = 0; matrix.A34 = -origin_world.y
-    matrix.A41 = 0; matrix.A42 = 0; matrix.A43 = 0; matrix.A44 = 1
+    matrix.A11 = -1; matrix.A12 = 0; matrix.A13 = 0; matrix.A14 = +origin_world.x
+    matrix.A21 =  0; matrix.A22 = 0; matrix.A23 = 1; matrix.A24 = -origin_world.z
+    matrix.A31 =  0; matrix.A32 = 1; matrix.A33 = 0; matrix.A34 = -origin_world.y
+    matrix.A41 =  0; matrix.A42 = 0; matrix.A43 = 0; matrix.A44 = 1
     return matrix
 
 
