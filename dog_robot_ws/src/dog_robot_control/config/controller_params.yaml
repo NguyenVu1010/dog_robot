@@ -1,0 +1,34 @@
+controller_node:
+  ros__parameters:
+    tick_rate: 50.0
+
+    joint_names:
+      - FL_hip_yaw
+      - FL_thigh_pitch
+      - FL_knee_pitch
+      - FR_hip_yaw
+      - FR_thigh_pitch
+      - FR_knee_pitch
+      - BL_hip_yaw
+      - BL_thigh_pitch
+      - BL_knee_pitch
+      - BR_hip_yaw
+      - BR_thigh_pitch
+      - BR_knee_pitch
+
+    gait:
+      cycle_time: 0.4
+      duty_factor: 0.5
+      step_height: 0.05
+      max_stride: 0.10
+      body_height: 0.140
+
+    cmd_vel:
+      max_linear_x: 0.20
+      max_linear_y: 0.10
+      max_angular_z: 0.50
+      lowpass_alpha: 0.2
+
+    debug:
+      publish_foot_markers: true
+      log_ik_warnings: true
