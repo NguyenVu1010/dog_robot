@@ -138,10 +138,10 @@ def _link_transform(origin_world):
 
 
 def _solids_to_mesh(solids, origin_world, deviation=0.5):
-    """Tessellate each solid (in its true world frame), transform to link-local, merge.
+    """Tessellate each solid in world frame, transform to link-local, merge.
 
-    Each FreeCAD object's .Shape is in LOCAL coords; we must apply the global
-    Placement (including parent App::Part container placement) to get world coords.
+    Note: o.Shape.tessellate() returns vertices in WORLD frame (placement already
+    applied by FreeCAD). So we just transform with the CAD→URDF matrix.
     """
     matrix = _link_transform(origin_world)
     scale = FreeCAD.Matrix()
@@ -150,14 +150,21 @@ def _solids_to_mesh(solids, origin_world, deviation=0.5):
     merged = Mesh.Mesh()
     for o in solids:
         try:
-            shape = o.Shape.copy()
-            # Apply global placement: local → world
-            global_pl = o.getGlobalPlacement()
-            shape.transformShape(global_pl.toMatrix())
-            # Apply CAD → URDF transform (X flip, Y↔Z swap, translate)
-            shape = shape.transformGeometry(matrix)
+            verts, facets = o.Shape.tessellate(deviation)
             mesh = Mesh.Mesh()
-            mesh.addFacets(shape.tessellate(deviation))
+            # Build triangle list from world-frame vertices, transformed by matrix
+            tris = []
+            for tri in facets:
+                pts = []
+                for idx in tri:
+                    v = verts[idx]
+                    # Apply matrix to world-frame vertex
+                    nx = matrix.A11*v.x + matrix.A12*v.y + matrix.A13*v.z + matrix.A14
+                    ny = matrix.A21*v.x + matrix.A22*v.y + matrix.A23*v.z + matrix.A24
+                    nz = matrix.A31*v.x + matrix.A32*v.y + matrix.A33*v.z + matrix.A34
+                    pts.append((nx, ny, nz))
+                tris.append(tuple(pts))
+            mesh.addFacets(tris)
             mesh.transform(scale)
             merged.addMesh(mesh)
         except Exception as e:
