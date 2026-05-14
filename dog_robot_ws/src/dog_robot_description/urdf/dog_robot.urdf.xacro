@@ -26,9 +26,26 @@
     </xacro:inertial_box>
   </link>
 
-  <xacro:leg prefix="FL" x_offset=" 0.100" y_offset=" 0.040" y_sign=" 1"/>
-  <xacro:leg prefix="FR" x_offset=" 0.100" y_offset="-0.040" y_sign="-1"/>
-  <xacro:leg prefix="BL" x_offset="-0.100" y_offset=" 0.040" y_sign=" 1"/>
-  <xacro:leg prefix="BR" x_offset="-0.100" y_offset="-0.040" y_sign="-1"/>
+  <!-- Joint origins measured from CAD (scripts/compute_joints.py). -->
+  <xacro:leg prefix="FL"
+             hip_xyz="0.10180 0.04342 0.02667"
+             thigh_xyz="-0.02099 0.02033 -0.01287"
+             knee_xyz="-0.03799 0.02250 -0.03872"
+             foot_xyz="0.02489 0.00091 -0.05492"/>
+  <xacro:leg prefix="FR"
+             hip_xyz="0.10180 -0.04362 0.02677"
+             thigh_xyz="-0.02084 -0.02075 -0.01264"
+             knee_xyz="-0.03756 -0.02348 -0.03881"
+             foot_xyz="0.02499 -0.00229 -0.05544"/>
+  <xacro:leg prefix="BL"
+             hip_xyz="-0.10373 0.04342 0.02667"
+             thigh_xyz="-0.01730 0.02029 -0.01459"
+             knee_xyz="-0.03206 0.02242 -0.04137"
+             foot_xyz="0.02987 0.00100 -0.05074"/>
+  <xacro:leg prefix="BR"
+             hip_xyz="-0.10178 -0.04362 0.02677"
+             thigh_xyz="-0.02063 -0.02133 -0.02285"
+             knee_xyz="-0.03221 -0.02338 -0.04135"
+             foot_xyz="0.03222 -0.00166 -0.04264"/>
 
 </robot>

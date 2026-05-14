@@ -18,34 +18,29 @@ PROJECT_ROOT = "/home/nguyenvd/workspace/dog_robot"
 MESH_OUT_VIS = f"{PROJECT_ROOT}/dog_robot_ws/src/dog_robot_description/meshes/visual"
 MESH_OUT_COL = f"{PROJECT_ROOT}/dog_robot_ws/src/dog_robot_description/meshes/collision"
 
-# Geometric constants (mm, IK frame in CAD)
-L1 = 12.5
-L2 = 48.95
-L3 = 109.202
-L4 = 115.0
-L = 200.0
-W = 80.0
+# Body center in CAD frame (dethan.step BoundBox center)
+BODY_CENTER_CAD = FreeCAD.Vector(100.0, -22.6, -40.0)
 
-# Body center in CAD frame (from inspection: dethan.step BoundBox center)
-BODY_CENTER_CAD = FreeCAD.Vector(100.0, 0.0, -40.0)
-
-# Hip offsets in IK frame: X=forward(length), Y=up, Z=lateral(left+)
-HIP_OFFSETS_IK = {
-    "FL": FreeCAD.Vector(+L/2, 0.0, +W/2),
-    "FR": FreeCAD.Vector(+L/2, 0.0, -W/2),
-    "BL": FreeCAD.Vector(-L/2, 0.0, +W/2),
-    "BR": FreeCAD.Vector(-L/2, 0.0, -W/2),
+# CAD-measured joint axis positions (mm) — derived from cluster centroid midpoints.
+# See scripts/compute_joints.py for derivation.
+CAD_JOINT_POSITIONS = {
+    "FL_hip_yaw":     (-1.8, 4.1, 3.4),
+    "FL_thigh_pitch": (19.2, -8.8, 23.8),
+    "FL_knee_pitch":  (57.2, -47.5, 46.3),
+    "FL_foot_fixed":  (32.3, -102.4, 47.2),
+    "FR_hip_yaw":     (-1.8, 4.2, -83.6),
+    "FR_thigh_pitch": (19.0, -8.5, -104.4),
+    "FR_knee_pitch":  (56.6, -47.3, -127.8),
+    "FR_foot_fixed":  (31.6, -102.7, -130.1),
+    "BL_hip_yaw":     (203.7, 4.1, 3.4),
+    "BL_thigh_pitch": (221.0, -10.5, 23.7),
+    "BL_knee_pitch":  (253.1, -51.9, 46.1),
+    "BL_foot_fixed":  (223.2, -102.6, 47.1),
+    "BR_hip_yaw":     (201.8, 4.2, -83.6),
+    "BR_thigh_pitch": (222.4, -18.7, -105.0),
+    "BR_knee_pitch":  (254.6, -60.0, -128.3),
+    "BR_foot_fixed":  (222.4, -102.7, -130.0),
 }
-
-
-def thigh_offset_from_hip_ik(side):
-    """L2 outward laterally in IK Z direction."""
-    sign = +1 if side == "L" else -1
-    return FreeCAD.Vector(0, 0, sign * L2)
-
-
-KNEE_OFFSET_FROM_THIGH_IK = FreeCAD.Vector(0, -L3, 0)
-FOOT_OFFSET_FROM_SHANK_IK = FreeCAD.Vector(0, -L4, 0)
 
 
 def _classify_solids(doc):
@@ -105,31 +100,25 @@ def _classify_solids(doc):
 
 
 def _link_origin_in_world(link_name):
-    """Joint origin in CAD frame for the link.
+    """Joint origin in CAD frame for the link — at the joint that connects it to parent.
 
-    CAD X axis is FLIPPED relative to IK X (CAD front is at small X, IK +X = front).
-    So when applying IK-frame offsets, we negate X.
+    Uses CAD-measured joint positions (see CAD_JOINT_POSITIONS).
     """
     if link_name == "base_link":
         return BODY_CENTER_CAD
 
+    # Map link name to the joint whose origin this link's mesh should center around
+    # e.g., FL_hip_link is the child of FL_hip_yaw joint → mesh origin at FL_hip_yaw axis
     parts = link_name.split("_")
     corner, seg = parts[0], parts[1]
-    side = corner[1]
-    ik_offset = HIP_OFFSETS_IK[corner]
-    hip_world = BODY_CENTER_CAD + FreeCAD.Vector(-ik_offset.x, ik_offset.y, ik_offset.z)
-    if seg == "hip":
-        return hip_world
-    thigh_world = hip_world + thigh_offset_from_hip_ik(side)
-    if seg == "thigh":
-        return thigh_world
-    knee_world = thigh_world + KNEE_OFFSET_FROM_THIGH_IK
-    if seg == "shank":
-        return knee_world
-    foot_world = knee_world + FOOT_OFFSET_FROM_SHANK_IK
-    if seg == "foot":
-        return foot_world
-    raise ValueError(f"Unknown link: {link_name}")
+    joint_key_map = {
+        "hip":   f"{corner}_hip_yaw",
+        "thigh": f"{corner}_thigh_pitch",
+        "shank": f"{corner}_knee_pitch",
+        "foot":  f"{corner}_foot_fixed",
+    }
+    pos = CAD_JOINT_POSITIONS[joint_key_map[seg]]
+    return FreeCAD.Vector(*pos)
 
 
 def _link_transform(origin_world):
