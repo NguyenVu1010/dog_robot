@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dog_gait"
+version = "0.1.0"
+description = "Gait state machine and foot trajectory planner for dog robot"
+requires-python = ">=3.10"
+dependencies = ["numpy", "dog_kinematics"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["dog_gait*"]
