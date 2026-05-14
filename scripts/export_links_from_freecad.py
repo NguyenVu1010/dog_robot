@@ -127,69 +127,81 @@ def _link_origin_in_world(link_name):
     raise ValueError(f"Unknown link: {link_name}")
 
 
-def _fuse_solids(solids):
-    if not solids:
-        return None
-    shape = solids[0].Shape.copy()
-    for o in solids[1:]:
-        try:
-            shape = shape.fuse(o.Shape)
-        except Exception as e:
-            print(f"  [WARN] fuse failed for {o.Label}: {e}")
-    return shape
-
-
-def _shape_to_link_local(shape, origin_world):
-    """Translate so origin_world → (0,0,0), then swap Y↔Z (IK → URDF REP-103).
-
-    Map: URDF_X = IK_X (forward), URDF_Y = IK_Z (left), URDF_Z = IK_Y (up).
-    """
-    s = shape.copy()
-    s.translate(-origin_world)
-    # Y↔Z swap matrix (NOT a rotation — reflection with det=-1, but FreeCAD accepts it)
+def _link_transform(origin_world):
+    """Return placement matrix: translate so origin_world→0, then swap Y↔Z."""
     matrix = FreeCAD.Matrix()
-    matrix.A11 = 1; matrix.A12 = 0; matrix.A13 = 0; matrix.A14 = 0
-    matrix.A21 = 0; matrix.A22 = 0; matrix.A23 = 1; matrix.A24 = 0
-    matrix.A31 = 0; matrix.A32 = 1; matrix.A33 = 0; matrix.A34 = 0
+    matrix.A11 = 1; matrix.A12 = 0; matrix.A13 = 0; matrix.A14 = -origin_world.x
+    matrix.A21 = 0; matrix.A22 = 0; matrix.A23 = 1; matrix.A24 = -origin_world.z
+    matrix.A31 = 0; matrix.A32 = 1; matrix.A33 = 0; matrix.A34 = -origin_world.y
     matrix.A41 = 0; matrix.A42 = 0; matrix.A43 = 0; matrix.A44 = 1
-    s = s.transformGeometry(matrix)
-    return s
+    return matrix
+
+
+def _solids_to_mesh(solids, origin_world, deviation=0.5):
+    """Tessellate each solid separately, transform to link-local frame, merge meshes.
+
+    Faster and more robust than Part.fuse() on many solids.
+    """
+    matrix = _link_transform(origin_world)
+    scale = FreeCAD.Matrix()
+    scale.scale(0.001, 0.001, 0.001)
+
+    merged = Mesh.Mesh()
+    for o in solids:
+        try:
+            shape = o.Shape.copy()
+            shape = shape.transformGeometry(matrix)
+            mesh = Mesh.Mesh()
+            mesh.addFacets(shape.tessellate(deviation))
+            mesh.transform(scale)
+            merged.addMesh(mesh)
+        except Exception as e:
+            print(f"  [WARN] tess failed for {o.Label}: {e}")
+    return merged
+
+
+def _convex_hull_mesh(merged_mesh):
+    """Compute convex hull of merged Mesh using vertex set."""
+    try:
+        from scipy.spatial import ConvexHull
+        import numpy as np
+        pts = np.array([(p.x, p.y, p.z) for p in merged_mesh.Points])
+        if len(pts) < 4:
+            return merged_mesh
+        hull = ConvexHull(pts)
+        hull_mesh = Mesh.Mesh()
+        facets = []
+        for simplex in hull.simplices:
+            tri = [tuple(pts[i]) for i in simplex]
+            facets.append(tri)
+        hull_mesh.addFacets(facets)
+        return hull_mesh
+    except ImportError:
+        # Fallback: just decimate the merged mesh
+        return merged_mesh
+    except Exception as e:
+        print(f"  [WARN] convex hull failed: {e}")
+        return merged_mesh
 
 
 def _export_link(link_name, solids):
     if not solids:
         print(f"  [SKIP] {link_name} (no solids)")
         return
-    shape = _fuse_solids(solids)
     origin = _link_origin_in_world(link_name)
-    shape_local = _shape_to_link_local(shape, origin)
 
     # Visual
-    mesh = Mesh.Mesh()
-    mesh.addFacets(shape_local.tessellate(0.5))
-    scale = FreeCAD.Matrix()
-    scale.scale(0.001, 0.001, 0.001)
-    mesh.transform(scale)
+    mesh_vis = _solids_to_mesh(solids, origin, deviation=0.5)
     out_vis = f"{MESH_OUT_VIS}/{link_name}.stl"
-    mesh.write(out_vis)
+    mesh_vis.write(out_vis)
 
-    # Collision (convex hull)
-    try:
-        if hasattr(shape_local, "makeConvexHull"):
-            hull = shape_local.makeConvexHull()
-        else:
-            hull = shape_local
-    except Exception as e:
-        print(f"  [WARN] convex hull failed for {link_name}: {e}")
-        hull = shape_local
-
-    mesh_col = Mesh.Mesh()
-    mesh_col.addFacets(hull.tessellate(1.0))
-    mesh_col.transform(scale)
+    # Collision (convex hull of merged mesh)
+    mesh_col_full = _solids_to_mesh(solids, origin, deviation=1.5)
+    mesh_col = _convex_hull_mesh(mesh_col_full)
     out_col = f"{MESH_OUT_COL}/{link_name}.stl"
     mesh_col.write(out_col)
 
-    print(f"  OK {link_name}")
+    print(f"  OK {link_name} ({len(solids)} solids, {mesh_vis.CountFacets} tris vis, {mesh_col.CountFacets} tris col)")
 
 
 def export_all():
