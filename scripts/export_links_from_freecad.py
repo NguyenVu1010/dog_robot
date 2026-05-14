@@ -138,9 +138,10 @@ def _link_transform(origin_world):
 
 
 def _solids_to_mesh(solids, origin_world, deviation=0.5):
-    """Tessellate each solid separately, transform to link-local frame, merge meshes.
+    """Tessellate each solid (in its true world frame), transform to link-local, merge.
 
-    Faster and more robust than Part.fuse() on many solids.
+    Each FreeCAD object's .Shape is in LOCAL coords; we must apply the global
+    Placement (including parent App::Part container placement) to get world coords.
     """
     matrix = _link_transform(origin_world)
     scale = FreeCAD.Matrix()
@@ -150,6 +151,10 @@ def _solids_to_mesh(solids, origin_world, deviation=0.5):
     for o in solids:
         try:
             shape = o.Shape.copy()
+            # Apply global placement: local → world
+            global_pl = o.getGlobalPlacement()
+            shape.transformShape(global_pl.toMatrix())
+            # Apply CAD → URDF transform (X flip, Y↔Z swap, translate)
             shape = shape.transformGeometry(matrix)
             mesh = Mesh.Mesh()
             mesh.addFacets(shape.tessellate(deviation))
