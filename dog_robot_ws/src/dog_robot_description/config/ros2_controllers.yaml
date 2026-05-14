@@ -1,0 +1,32 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 100  # Hz
+
+    joint_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+joint_trajectory_controller:
+  ros__parameters:
+    joints:
+      - FL_hip_yaw
+      - FL_thigh_pitch
+      - FL_knee_pitch
+      - FR_hip_yaw
+      - FR_thigh_pitch
+      - FR_knee_pitch
+      - BL_hip_yaw
+      - BL_thigh_pitch
+      - BL_knee_pitch
+      - BR_hip_yaw
+      - BR_thigh_pitch
+      - BR_knee_pitch
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    state_publish_rate: 50.0
+    action_monitor_rate: 20.0

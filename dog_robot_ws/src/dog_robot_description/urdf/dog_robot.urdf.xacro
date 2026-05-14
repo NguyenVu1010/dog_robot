@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="dog_robot">
+
+  <xacro:include filename="$(find dog_robot_description)/urdf/materials.xacro"/>
+  <xacro:include filename="$(find dog_robot_description)/urdf/inertial.xacro"/>
+  <xacro:include filename="$(find dog_robot_description)/urdf/leg.xacro"/>
+  <xacro:include filename="$(find dog_robot_description)/urdf/gazebo.xacro"/>
+  <xacro:include filename="$(find dog_robot_description)/urdf/ros2_control.xacro"/>
+
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://dog_robot_description/meshes/visual/base_link.stl"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://dog_robot_description/meshes/collision/base_link.stl"/>
+      </geometry>
+    </collision>
+    <xacro:inertial_box mass="0.80" x="0.200" y="0.080" z="0.060">
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </xacro:inertial_box>
+  </link>
+
+  <xacro:leg prefix="FL" x_offset=" 0.100" y_offset=" 0.040" y_sign=" 1"/>
+  <xacro:leg prefix="FR" x_offset=" 0.100" y_offset="-0.040" y_sign="-1"/>
+  <xacro:leg prefix="BL" x_offset="-0.100" y_offset=" 0.040" y_sign=" 1"/>
+  <xacro:leg prefix="BR" x_offset="-0.100" y_offset="-0.040" y_sign="-1"/>
+
+</robot>

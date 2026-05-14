@@ -1,0 +1,33 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 1
+      Class: rviz_default_plugins/RobotModel
+      Description Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /robot_description
+      Enabled: true
+      Name: RobotModel
+      Visual Enabled: true
+      Collision Enabled: false
+    - Class: rviz_default_plugins/TF
+      Enabled: true
+      Name: TF
+    - Class: rviz_default_plugins/Grid
+      Enabled: true
+      Name: Grid
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: base_link
+  Tools:
+    - Class: rviz_default_plugins/Orbit
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 1.5
