@@ -23,9 +23,16 @@
     <self_collide>false</self_collide>
   </gazebo>
 
+  <!--
+    The gazebo_ros2_control plugin hangs at startup when the <parameters>
+    tag contains a $(find ...) substitution. Pass the absolute path in
+    via a xacro arg from the launch file so what reaches Gazebo is a
+    plain string.
+  -->
+  <xacro:arg name="controllers_yaml_path" default=""/>
   <gazebo>
     <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
-      <parameters>$(find dog_robot_description)/config/ros2_controllers.yaml</parameters>
+      <parameters>$(arg controllers_yaml_path)</parameters>
     </plugin>
   </gazebo>
 

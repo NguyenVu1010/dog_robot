@@ -11,9 +11,16 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     pkg = FindPackageShare("dog_robot_description")
     urdf_xacro = PathJoinSubstitution([pkg, "urdf", "dog_robot.urdf.xacro"])
+    controllers_yaml = PathJoinSubstitution([pkg, "config", "ros2_controllers.yaml"])
 
+    # Resolve the controllers yaml absolute path at xacro-process time and inject
+    # it as a literal string into <parameters>; gazebo_ros2_control hangs on a
+    # $(find ...) substitution there.
     robot_description = {
-        "robot_description": Command([FindExecutable(name="xacro"), " ", urdf_xacro])
+        "robot_description": Command([
+            FindExecutable(name="xacro"), " ", urdf_xacro,
+            " controllers_yaml_path:=", controllers_yaml,
+        ])
     }
 
     gazebo = IncludeLaunchDescription(
@@ -37,6 +44,7 @@ def generate_launch_description():
             "-topic", "robot_description",
             "-entity", "dog_robot",
             "-z", "0.30",
+            "-timeout", "120",  # gazebo_ros_factory can take >30s to come up here
         ],
         output="screen",
     )
