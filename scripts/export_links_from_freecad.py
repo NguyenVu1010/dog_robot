@@ -24,22 +24,22 @@ BODY_CENTER_CAD = FreeCAD.Vector(100.0, -22.6, -40.0)
 # CAD-measured joint axis positions (mm) — derived from cluster centroid midpoints.
 # See scripts/compute_joints.py for derivation.
 CAD_JOINT_POSITIONS = {
-    "FL_hip_yaw":     (-1.8, 4.1, 3.4),
-    "FL_thigh_pitch": (19.2, -8.8, 23.8),
-    "FL_knee_pitch":  (57.2, -47.5, 46.3),
-    "FL_foot_fixed":  (32.3, -102.4, 47.2),
-    "FR_hip_yaw":     (-1.8, 4.2, -83.6),
-    "FR_thigh_pitch": (19.0, -8.5, -104.4),
-    "FR_knee_pitch":  (56.6, -47.3, -127.8),
+    "FL_hip_yaw":     (25.2,   12.5,    0.0),
+    "FL_thigh_pitch": (0.0,    -0.7,   25.4),
+    "FL_knee_pitch":  (88.9,  -65.2,   66.4),
+    "FL_foot_fixed":  (32.3, -102.4,   47.2),
+    "FR_hip_yaw":     (25.2,   12.5,  -80.0),
+    "FR_thigh_pitch": (0.0,     0.0, -105.7),
+    "FR_knee_pitch":  (88.0,  -64.7, -148.4),
     "FR_foot_fixed":  (31.6, -102.7, -130.1),
-    "BL_hip_yaw":     (203.7, 4.1, 3.4),
-    "BL_thigh_pitch": (221.0, -10.5, 23.7),
-    "BL_knee_pitch":  (253.1, -51.9, 46.1),
-    "BL_foot_fixed":  (223.2, -102.6, 47.1),
-    "BR_hip_yaw":     (201.8, 4.2, -83.6),
-    "BR_thigh_pitch": (222.4, -18.7, -105.0),
-    "BR_knee_pitch":  (254.6, -60.0, -128.3),
-    "BR_foot_fixed":  (222.4, -102.7, -130.0),
+    "BL_hip_yaw":     (174.8,  12.5,    0.0),
+    "BL_thigh_pitch": (200.0,  -0.7,   25.4),
+    "BL_knee_pitch":  (283.4, -72.3,   66.2),
+    "BL_foot_fixed":  (223.2,-102.6,   47.1),
+    "BR_hip_yaw":     (174.8,  12.5,  -80.0),
+    "BR_thigh_pitch": (200.0,   0.0, -105.7),
+    "BR_knee_pitch":  (283.0, -71.0, -148.4),
+    "BR_foot_fixed":  (222.4,-102.7, -130.0),
 }
 
 
@@ -61,10 +61,16 @@ def _classify_solids(doc):
         bb = o.Shape.BoundBox
         cx, cy, cz = bb.Center.x, bb.Center.y, bb.Center.z
 
-        # BODY parts
+        # Skip screws / unnamed (must come BEFORE body classification, else
+        # screws labeled "...Phillips Head..." fall into base_link via "head" match)
+        if ("screw" in name or "passivated" in name
+                or "______" in o.Label or "------" in o.Label):
+            continue
+
+        # BODY parts (use "headcam" not "head" to avoid screw label false-match)
         if any(k in name for k in [
             "dethan", "thanhngang", "opthan", "opkhop", "noi2op",
-            "head", "duoi", "rpi lcd", "3.5inch",
+            "headcam", "duoi", "rpi lcd", "3.5inch",
         ]):
             clusters["base_link"].append(o)
             continue
@@ -73,11 +79,6 @@ def _classify_solids(doc):
         if "demchan" in name:
             corner = ("F" if cx < 100 else "B") + ("L" if cz > -40 else "R")
             clusters[f"{corner}_foot_link"].append(o)
-            continue
-
-        # Skip screws / unnamed
-        if ("screw" in name or "passivated" in name
-                or "______" in o.Label or "------" in o.Label):
             continue
 
         # LEG parts: part1=hip, part2=thigh, part3=shank
@@ -137,18 +138,63 @@ def _link_transform(origin_world):
     return matrix
 
 
+# Head sub-assembly has its own local frame in the SolidWorks part — appears
+# rotated 90° when placed in body assembly, AND offset laterally to one side.
+# Apply pre-rotation around CAD-Y (vertical), then translate to a target
+# CAD-frame position before CAD→URDF transform. Adjust HEAD_ROTATION_DEG (±90)
+# and HEAD_TARGET_CENTER if alignment still off.
+HEAD_KEYWORDS = ("headcam", "lcd", "3.5inch")
+HEAD_ROTATION_DEG = -90  # rotate around CAD-Y; flip sign if direction wrong
+HEAD_TARGET_CENTER = (-53.628, 5.776, -34.631)  # CAD frame target for head center
+# Computed from 2 face mate constraints (see scripts/probe_head_target.py):
+#   Coincident: head_F087.Face106 ≡ body_F093.Face26 (opthan1.step001)
+#   Parallel:   head_F087.Face124 || body_F093.Face18
+# Rotation -90° around CAD-Y satisfies both mates' normal alignment.
+# Translation derived from rotated face center → body face center.
+# → URDF: (+153.6, +5.4, +28.4) head exactly attached at body neck face
+
+
+def _is_head_solid(o):
+    name = o.Label.lower()
+    return any(k in name for k in HEAD_KEYWORDS)
+
+
+def _head_group_center(solids):
+    head = [s for s in solids if _is_head_solid(s)]
+    if not head:
+        return None
+    bbs = [s.Shape.BoundBox.Center for s in head]
+    return FreeCAD.Vector(
+        sum(b.x for b in bbs) / len(bbs),
+        sum(b.y for b in bbs) / len(bbs),
+        sum(b.z for b in bbs) / len(bbs),
+    )
+
+
 def _solids_to_mesh(solids, origin_world, deviation=0.5):
     """Tessellate each solid in world frame, transform to link-local, merge.
 
     Note: o.Shape.tessellate() returns vertices in WORLD frame (placement already
     applied by FreeCAD). So we just transform with the CAD→URDF matrix.
     """
+    import math
     matrix = _link_transform(origin_world)
     scale = FreeCAD.Matrix()
     scale.scale(0.001, 0.001, 0.001)
 
+    head_center = _head_group_center(solids)
+    ha = math.radians(HEAD_ROTATION_DEG)
+    cos_h, sin_h = math.cos(ha), math.sin(ha)
+    if head_center is not None:
+        head_tx = HEAD_TARGET_CENTER[0] - head_center.x
+        head_ty = HEAD_TARGET_CENTER[1] - head_center.y
+        head_tz = HEAD_TARGET_CENTER[2] - head_center.z
+    else:
+        head_tx = head_ty = head_tz = 0.0
+
     merged = Mesh.Mesh()
     for o in solids:
+        is_head = head_center is not None and _is_head_solid(o)
         try:
             verts, facets = o.Shape.tessellate(deviation)
             mesh = Mesh.Mesh()
@@ -158,10 +204,20 @@ def _solids_to_mesh(solids, origin_world, deviation=0.5):
                 pts = []
                 for idx in tri:
                     v = verts[idx]
+                    # Pre-rotate head solids around head_center (CAD-Y axis),
+                    # then translate head so its center moves to HEAD_TARGET_CENTER.
+                    if is_head:
+                        dx = v.x - head_center.x
+                        dz = v.z - head_center.z
+                        vx = head_center.x + cos_h * dx + sin_h * dz + head_tx
+                        vy = v.y + head_ty
+                        vz = head_center.z - sin_h * dx + cos_h * dz + head_tz
+                    else:
+                        vx, vy, vz = v.x, v.y, v.z
                     # Apply matrix to world-frame vertex
-                    nx = matrix.A11*v.x + matrix.A12*v.y + matrix.A13*v.z + matrix.A14
-                    ny = matrix.A21*v.x + matrix.A22*v.y + matrix.A23*v.z + matrix.A24
-                    nz = matrix.A31*v.x + matrix.A32*v.y + matrix.A33*v.z + matrix.A34
+                    nx = matrix.A11*vx + matrix.A12*vy + matrix.A13*vz + matrix.A14
+                    ny = matrix.A21*vx + matrix.A22*vy + matrix.A23*vz + matrix.A24
+                    nz = matrix.A31*vx + matrix.A32*vy + matrix.A33*vz + matrix.A34
                     pts.append((nx, ny, nz))
                 tris.append(tuple(pts))
             mesh.addFacets(tris)

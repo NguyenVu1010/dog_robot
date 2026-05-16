@@ -17,3 +17,7 @@ log/
 # IDE
 .vscode/
 .idea/
+
+# CAD sources (not tracked; user-provided)
+TestIK/
+step/

@@ -59,6 +59,28 @@ centroids = {name: avg(pts) for name, pts in CLUSTERS.items()}
 # Body center: use dethan center (the main body solid)
 BODY_CENTER = (100.0, -22.6, -40.0)
 
+# Joint axis centers measured from CAD circular edges via
+# scripts/find_part3_joints.py (knee) and direct MCP queries (hip, thigh).
+# Replaces cluster-centroid approximation that was off by 20-30mm.
+MEASURED_HIP = {
+    "FL": (25.200,  12.500,    0.000),
+    "FR": (25.200,  12.500,  -80.000),
+    "BL": (174.800, 12.500,    0.000),
+    "BR": (174.800, 12.500,  -80.000),
+}
+MEASURED_THIGH = {
+    "FL": (0.000,   -0.671,   25.362),
+    "FR": (0.000,    0.000, -105.700),
+    "BL": (200.000, -0.675,   25.361),
+    "BR": (200.000,  0.000, -105.700),
+}
+MEASURED_KNEE = {
+    "FL": (88.875,  -65.224,   66.379),
+    "FR": (87.991,  -64.673, -148.400),
+    "BL": (283.410, -72.261,   66.183),
+    "BR": (282.987, -70.980, -148.400),
+}
+
 # Joint positions per leg
 # Per classifier name: FL = front-near-left, BL = back-near-left, FR = front-far-right, BR = back-far-right
 # But we want URDF names that match the actual position semantics.
@@ -76,9 +98,9 @@ for leg in ["FL", "FR", "BL", "BR"]:
     thigh = centroids[f"{leg}_thigh_link"]
     shank = centroids[f"{leg}_shank_link"]
     foot = centroids[f"{leg}_foot_link"]
-    j_hip = hip
-    j_thigh = mid(hip, thigh)
-    j_knee = mid(thigh, shank)
+    j_hip = MEASURED_HIP[leg]
+    j_thigh = MEASURED_THIGH[leg]
+    j_knee = MEASURED_KNEE[leg]
     j_foot = mid(shank, foot)
     print(f'  "{leg}_hip_yaw":     ({j_hip[0]:.1f}, {j_hip[1]:.1f}, {j_hip[2]:.1f}),')
     print(f'  "{leg}_thigh_pitch": ({j_thigh[0]:.1f}, {j_thigh[1]:.1f}, {j_thigh[2]:.1f}),')
@@ -98,9 +120,9 @@ for leg in ["FL", "FR", "BL", "BR"]:
     thigh = centroids[f"{leg}_thigh_link"]
     shank = centroids[f"{leg}_shank_link"]
     foot = centroids[f"{leg}_foot_link"]
-    j_hip = hip
-    j_thigh = mid(hip, thigh)
-    j_knee = mid(thigh, shank)
+    j_hip = MEASURED_HIP[leg]
+    j_thigh = MEASURED_THIGH[leg]
+    j_knee = MEASURED_KNEE[leg]
     j_foot = mid(shank, foot)
 
     u_hip = to_urdf(j_hip, BODY_CENTER)         # base → hip
