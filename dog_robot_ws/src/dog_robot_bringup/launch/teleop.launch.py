@@ -10,6 +10,6 @@ def generate_launch_description():
             executable="teleop_keyboard",
             name="teleop_keyboard",
             output="screen",
-            prefix="xterm -e",  # run in its own terminal so stdin is interactive
+            prefix="gnome-terminal --",  # run in its own terminal so stdin is interactive
         ),
     ])
