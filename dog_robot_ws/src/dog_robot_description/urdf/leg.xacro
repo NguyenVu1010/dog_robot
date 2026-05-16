@@ -1,7 +1,9 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="dog_robot_leg">
 
-  <xacro:macro name="leg" params="prefix x_offset y_offset y_sign">
+  <!-- Joint origins are measured from CAD (see scripts/compute_joints.py). -->
+  <xacro:macro name="leg" params="prefix
+                                  hip_xyz thigh_xyz knee_xyz foot_xyz">
 
     <link name="${prefix}_hip_link">
       <visual>
@@ -25,7 +27,7 @@
     <joint name="${prefix}_hip_yaw" type="revolute">
       <parent link="base_link"/>
       <child link="${prefix}_hip_link"/>
-      <origin xyz="${x_offset} ${y_offset} 0" rpy="0 0 0"/>
+      <origin xyz="${hip_xyz}" rpy="0 0 0"/>
       <axis xyz="1 0 0"/>
       <limit lower="-0.785" upper="0.785" effort="2.0" velocity="5.0"/>
       <dynamics damping="0.01" friction="0.0"/>
@@ -53,7 +55,7 @@
     <joint name="${prefix}_thigh_pitch" type="revolute">
       <parent link="${prefix}_hip_link"/>
       <child link="${prefix}_thigh_link"/>
-      <origin xyz="0 ${y_sign * 0.04895} 0" rpy="0 0 0"/>
+      <origin xyz="${thigh_xyz}" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
       <limit lower="-1.571" upper="1.571" effort="2.0" velocity="5.0"/>
       <dynamics damping="0.01" friction="0.0"/>
@@ -81,7 +83,7 @@
     <joint name="${prefix}_knee_pitch" type="revolute">
       <parent link="${prefix}_thigh_link"/>
       <child link="${prefix}_shank_link"/>
-      <origin xyz="0 0 -0.109202" rpy="0 0 0"/>
+      <origin xyz="${knee_xyz}" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
       <limit lower="0.0" upper="2.617" effort="2.0" velocity="5.0"/>
       <dynamics damping="0.01" friction="0.0"/>
@@ -109,7 +111,7 @@
     <joint name="${prefix}_foot_fixed" type="fixed">
       <parent link="${prefix}_shank_link"/>
       <child link="${prefix}_foot_link"/>
-      <origin xyz="0 0 -0.115" rpy="0 0 0"/>
+      <origin xyz="${foot_xyz}" rpy="0 0 0"/>
     </joint>
 
   </xacro:macro>
