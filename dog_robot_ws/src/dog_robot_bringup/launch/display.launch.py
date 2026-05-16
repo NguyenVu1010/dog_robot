@@ -1,4 +1,4 @@
-"""Launch RViz + joint_state_publisher_gui to visualize the robot URDF."""
+"""RViz + joint_state_publisher_gui to visualize the robot URDF."""
 from launch import LaunchDescription
 from launch.substitutions import Command, FindExecutable, PathJoinSubstitution
 from launch_ros.actions import Node

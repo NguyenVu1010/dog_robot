@@ -13,10 +13,15 @@ source install/setup.bash
 
 ## Launch
 
+Entry points live in `dog_robot_bringup`:
+
 ```bash
-ros2 launch dog_robot_description display.launch.py     # RViz + joint slider
-ros2 launch dog_robot_description gazebo.launch.py      # Gazebo Classic sim
+ros2 launch dog_robot_bringup display.launch.py   # RViz + joint slider
+ros2 launch dog_robot_bringup sim.launch.py       # Gazebo + control stack
 ```
+
+`gazebo.launch.py` here is a low-level building block used by bringup; you
+usually do not invoke it directly.
 
 ## Test
 

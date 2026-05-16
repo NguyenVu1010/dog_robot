@@ -14,7 +14,7 @@ def test_robot_moves_forward_in_gazebo():
     env["DISPLAY"] = ""
 
     proc = subprocess.Popen(
-        ["ros2", "launch", "dog_robot_control", "full_sim.launch.py"],
+        ["ros2", "launch", "dog_robot_bringup", "sim.launch.py"],
         env=env,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
