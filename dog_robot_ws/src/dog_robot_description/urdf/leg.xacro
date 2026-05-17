@@ -51,7 +51,7 @@
       <child link="${prefix}_hip_link"/>
       <origin xyz="${hip_xyz}" rpy="0 0 0"/>
       <axis xyz="1 0 0"/>
-      <limit lower="-0.785" upper="0.785" effort="2.0" velocity="5.0"/>
+      <limit lower="-0.785" upper="0.785" effort="5.0" velocity="8.0"/>
       <dynamics damping="0.05" friction="0.0"/>
     </joint>
 
@@ -79,7 +79,7 @@
       <child link="${prefix}_thigh_link"/>
       <origin xyz="${thigh_xyz}" rpy="0 ${thigh_rpy} 0"/>
       <axis xyz="0 1 0"/>
-      <limit lower="-2.5" upper="2.5" effort="2.0" velocity="5.0"/>
+      <limit lower="-2.5" upper="2.5" effort="5.0" velocity="8.0"/>
       <dynamics damping="0.05" friction="0.0"/>
     </joint>
 
@@ -107,7 +107,7 @@
       <child link="${prefix}_shank_link"/>
       <origin xyz="${knee_xyz}" rpy="0 ${knee_rpy} 0"/>
       <axis xyz="0 1 0"/>
-      <limit lower="-2.5" upper="2.5" effort="2.0" velocity="5.0"/>
+      <limit lower="-2.5" upper="2.5" effort="5.0" velocity="8.0"/>
       <dynamics damping="0.05" friction="0.0"/>
     </joint>
 

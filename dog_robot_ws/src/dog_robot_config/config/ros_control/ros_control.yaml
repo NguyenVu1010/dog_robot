@@ -32,15 +32,15 @@ joint_group_effort_controller:
       - velocity
 
     gains:
-      FL_hip_yaw     : {p: 20.0, i: 0.05, d: 0.2, i_clamp: 0.5}
-      FL_thigh_pitch : {p: 20.0, i: 0.05, d: 0.2, i_clamp: 0.5}
-      FL_knee_pitch  : {p: 20.0, i: 0.05, d: 0.2, i_clamp: 0.5}
-      FR_hip_yaw     : {p: 20.0, i: 0.05, d: 0.2, i_clamp: 0.5}
-      FR_thigh_pitch : {p: 20.0, i: 0.05, d: 0.2, i_clamp: 0.5}
-      FR_knee_pitch  : {p: 20.0, i: 0.05, d: 0.2, i_clamp: 0.5}
-      BL_hip_yaw     : {p: 20.0, i: 0.05, d: 0.2, i_clamp: 0.5}
-      BL_thigh_pitch : {p: 20.0, i: 0.05, d: 0.2, i_clamp: 0.5}
-      BL_knee_pitch  : {p: 20.0, i: 0.05, d: 0.2, i_clamp: 0.5}
-      BR_hip_yaw     : {p: 20.0, i: 0.05, d: 0.2, i_clamp: 0.5}
-      BR_thigh_pitch : {p: 20.0, i: 0.05, d: 0.2, i_clamp: 0.5}
-      BR_knee_pitch  : {p: 20.0, i: 0.05, d: 0.2, i_clamp: 0.5}
+      FL_hip_yaw     : {p: 80.0, i: 0.15, d: 0.8, i_clamp: 2.0}
+      FL_thigh_pitch : {p: 80.0, i: 0.15, d: 0.8, i_clamp: 2.0}
+      FL_knee_pitch  : {p: 80.0, i: 0.15, d: 0.8, i_clamp: 2.0}
+      FR_hip_yaw     : {p: 80.0, i: 0.15, d: 0.8, i_clamp: 2.0}
+      FR_thigh_pitch : {p: 80.0, i: 0.15, d: 0.8, i_clamp: 2.0}
+      FR_knee_pitch  : {p: 80.0, i: 0.15, d: 0.8, i_clamp: 2.0}
+      BL_hip_yaw     : {p: 80.0, i: 0.15, d: 0.8, i_clamp: 2.0}
+      BL_thigh_pitch : {p: 80.0, i: 0.15, d: 0.8, i_clamp: 2.0}
+      BL_knee_pitch  : {p: 80.0, i: 0.15, d: 0.8, i_clamp: 2.0}
+      BR_hip_yaw     : {p: 80.0, i: 0.15, d: 0.8, i_clamp: 2.0}
+      BR_thigh_pitch : {p: 80.0, i: 0.15, d: 0.8, i_clamp: 2.0}
+      BR_knee_pitch  : {p: 80.0, i: 0.15, d: 0.8, i_clamp: 2.0}
