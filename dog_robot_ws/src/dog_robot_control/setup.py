@@ -17,7 +17,7 @@ setup(
         (os.path.join("share", package_name, "config"),
             glob("config/*.yaml")),
     ],
-    install_requires=["setuptools", "numpy", "dog_kinematics", "dog_gait"],
+    install_requires=["setuptools", "numpy"],
     zip_safe=True,
     maintainer="nguyenvd",
     maintainer_email="nguyenvd11@fpt.com",
@@ -26,7 +26,6 @@ setup(
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
-            "controller_node = dog_robot_control.controller_node:main",
             "teleop_keyboard = dog_robot_control.teleop_keyboard:main",
         ],
     },

@@ -11,14 +11,14 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://dog_robot_description/meshes/visual/base_link.stl"/>
+        <mesh filename="file://$(find dog_robot_description)/meshes/visual/base_link.stl"/>
       </geometry>
       <material name="grey"/>
     </visual>
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://dog_robot_description/meshes/collision/base_link.stl"/>
+        <mesh filename="file://$(find dog_robot_description)/meshes/collision/base_link.stl"/>
       </geometry>
     </collision>
     <xacro:inertial_box mass="0.80" x="0.200" y="0.080" z="0.060">
@@ -26,26 +26,57 @@
     </xacro:inertial_box>
   </link>
 
-  <!-- Joint origins measured from CAD (scripts/compute_joints.py). -->
+  <!-- Joint origins measured from CAD (scripts/compute_joints.py).
+       The thigh/knee rpy_y values and compensating mesh rpy_y values
+       rotate the thigh and shank link frames so knee_xyz and foot_xyz
+       lie along -Z. This makes CHAMP's IK trivially produce ~0 for
+       thigh_pitch/knee_pitch when the foot is directly below the hip.
+       foot_sphere_xyz is the original (0.042, 0, -0.029) collision
+       sphere offset re-expressed in the rotated foot_link frame:
+       sphere_new = Ry(-(thigh_rpy + knee_rpy)) * sphere_old. -->
   <xacro:leg prefix="FL"
              hip_xyz="0.07480 0.04000 0.03510"
              thigh_xyz="0.02520 0.02536 -0.01317"
-             knee_xyz="-0.08887 0.04102 -0.06455"
-             foot_xyz="0.05659 -0.01922 -0.03721"/>
+             knee_xyz="0.0 0.04102 -0.10984"
+             foot_xyz="0.0 -0.01922 -0.06773"
+             thigh_rpy="0.94261"
+             knee_rpy="-1.93175"
+             mesh_thigh_rpy="-0.94261"
+             mesh_shank_rpy="0.98914"
+             mesh_foot_rpy="0.98914"
+             foot_sphere_xyz="-0.0011 0 -0.0510"/>
   <xacro:leg prefix="FR"
              hip_xyz="0.07480 -0.04000 0.03510"
              thigh_xyz="0.02520 -0.02570 -0.01250"
-             knee_xyz="-0.08799 -0.04270 -0.06467"
-             foot_xyz="0.05638 0.01826 -0.03805"/>
+             knee_xyz="0.0 -0.04270 -0.10920"
+             foot_xyz="0.0 0.01826 -0.06802"
+             thigh_rpy="0.93698"
+             knee_rpy="-1.91411"
+             mesh_thigh_rpy="-0.93698"
+             mesh_shank_rpy="0.97713"
+             mesh_foot_rpy="0.97713"
+             foot_sphere_xyz="-0.0007 0 -0.0511"/>
   <xacro:leg prefix="BL"
              hip_xyz="-0.07480 0.04000 0.03510"
              thigh_xyz="-0.02520 0.02536 -0.01318"
-             knee_xyz="-0.08341 0.04082 -0.07159"
-             foot_xyz="0.06019 -0.01906 -0.03038"/>
+             knee_xyz="0.0 0.04082 -0.10992"
+             foot_xyz="0.0 -0.01906 -0.06742"
+             thigh_rpy="0.86151"
+             knee_rpy="-1.96488"
+             mesh_thigh_rpy="-0.86151"
+             mesh_shank_rpy="1.10337"
+             mesh_foot_rpy="1.10337"
+             foot_sphere_xyz="-0.0071 0 -0.0505"/>
   <xacro:leg prefix="BR"
              hip_xyz="-0.07480 -0.04000 0.03510"
              thigh_xyz="-0.02520 -0.02570 -0.01250"
-             knee_xyz="-0.08299 -0.04270 -0.07098"
-             foot_xyz="0.06059 0.01842 -0.03169"/>
+             knee_xyz="0.0 -0.04270 -0.10920"
+             foot_xyz="0.0 0.01842 -0.06838"
+             thigh_rpy="0.86324"
+             knee_rpy="-1.95214"
+             mesh_thigh_rpy="-0.86324"
+             mesh_shank_rpy="1.08890"
+             mesh_foot_rpy="1.08890"
+             foot_sphere_xyz="-0.0063 0 -0.0507"/>
 
 </robot>
