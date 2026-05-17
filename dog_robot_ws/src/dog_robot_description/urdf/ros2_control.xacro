@@ -3,9 +3,9 @@
 
   <xacro:macro name="joint_iface" params="name lower upper">
     <joint name="${name}">
-      <command_interface name="position">
-        <param name="min">${lower}</param>
-        <param name="max">${upper}</param>
+      <command_interface name="effort">
+        <param name="min">-2.0</param>
+        <param name="max">2.0</param>
       </command_interface>
       <state_interface name="position"/>
       <state_interface name="velocity"/>

@@ -5,11 +5,12 @@
     <gazebo reference="${prefix}_foot_link">
       <mu1>1.0</mu1>
       <mu2>1.0</mu2>
-      <kp>1000000.0</kp>
-      <kd>100.0</kd>
+      <kp>1000.0</kp>
+      <kd>1.0</kd>
       <minDepth>0.001</minDepth>
       <maxVel>0.1</maxVel>
       <material>Gazebo/DarkGrey</material>
+      <self_collide>false</self_collide>
     </gazebo>
   </xacro:macro>
 
@@ -18,21 +19,36 @@
   <xacro:foot_friction prefix="BL"/>
   <xacro:foot_friction prefix="BR"/>
 
+  <xacro:macro name="no_self_collide" params="link">
+    <gazebo reference="${link}">
+      <self_collide>false</self_collide>
+    </gazebo>
+  </xacro:macro>
+
+  <!-- Hip meshes overlap base_link bbox; thigh/shank chain may also
+       overlap adjacent links. Disable self-collision on every leg
+       link so ODE doesn't apply huge separation impulses at spawn. -->
+  <xacro:no_self_collide link="FL_hip_link"/>
+  <xacro:no_self_collide link="FL_thigh_link"/>
+  <xacro:no_self_collide link="FL_shank_link"/>
+  <xacro:no_self_collide link="FR_hip_link"/>
+  <xacro:no_self_collide link="FR_thigh_link"/>
+  <xacro:no_self_collide link="FR_shank_link"/>
+  <xacro:no_self_collide link="BL_hip_link"/>
+  <xacro:no_self_collide link="BL_thigh_link"/>
+  <xacro:no_self_collide link="BL_shank_link"/>
+  <xacro:no_self_collide link="BR_hip_link"/>
+  <xacro:no_self_collide link="BR_thigh_link"/>
+  <xacro:no_self_collide link="BR_shank_link"/>
+
   <gazebo reference="base_link">
     <material>Gazebo/Grey</material>
     <self_collide>false</self_collide>
   </gazebo>
 
-  <!--
-    The gazebo_ros2_control plugin hangs at startup when the <parameters>
-    tag contains a $(find ...) substitution. Pass the absolute path in
-    via a xacro arg from the launch file so what reaches Gazebo is a
-    plain string.
-  -->
-  <xacro:arg name="controllers_yaml_path" default=""/>
   <gazebo>
     <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
-      <parameters>$(arg controllers_yaml_path)</parameters>
+      <parameters>$(find dog_robot_config)/config/ros_control/ros_control.yaml</parameters>
     </plugin>
   </gazebo>
 
