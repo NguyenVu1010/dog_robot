@@ -9,14 +9,17 @@
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://dog_robot_description/meshes/visual/${prefix}_hip_link.stl"/>
+          <mesh filename="file://$(find dog_robot_description)/meshes/visual/${prefix}_hip_link.stl"/>
         </geometry>
         <material name="grey"/>
       </visual>
+      <!-- Small box collision keeps ODE physics active on this branch.
+           Self-collisions are disabled in gazebo.xacro so legs don't
+           prop the body up. -->
       <collision>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://dog_robot_description/meshes/collision/${prefix}_hip_link.stl"/>
+          <box size="0.03 0.03 0.03"/>
         </geometry>
       </collision>
       <xacro:inertial_box mass="0.15" x="0.04" y="0.04" z="0.04">
@@ -30,21 +33,21 @@
       <origin xyz="${hip_xyz}" rpy="0 0 0"/>
       <axis xyz="1 0 0"/>
       <limit lower="-0.785" upper="0.785" effort="2.0" velocity="5.0"/>
-      <dynamics damping="0.01" friction="0.0"/>
+      <dynamics damping="0.05" friction="0.0"/>
     </joint>
 
     <link name="${prefix}_thigh_link">
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://dog_robot_description/meshes/visual/${prefix}_thigh_link.stl"/>
+          <mesh filename="file://$(find dog_robot_description)/meshes/visual/${prefix}_thigh_link.stl"/>
         </geometry>
         <material name="dark_grey"/>
       </visual>
       <collision>
-        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <origin xyz="0 0 -0.05" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://dog_robot_description/meshes/collision/${prefix}_thigh_link.stl"/>
+          <box size="0.02 0.02 0.08"/>
         </geometry>
       </collision>
       <xacro:inertial_box mass="0.10" x="0.03" y="0.03" z="0.10">
@@ -58,21 +61,21 @@
       <origin xyz="${thigh_xyz}" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
       <limit lower="-1.571" upper="1.571" effort="2.0" velocity="5.0"/>
-      <dynamics damping="0.01" friction="0.0"/>
+      <dynamics damping="0.05" friction="0.0"/>
     </joint>
 
     <link name="${prefix}_shank_link">
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://dog_robot_description/meshes/visual/${prefix}_shank_link.stl"/>
+          <mesh filename="file://$(find dog_robot_description)/meshes/visual/${prefix}_shank_link.stl"/>
         </geometry>
         <material name="grey"/>
       </visual>
       <collision>
-        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <origin xyz="0 0 -0.0575" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://dog_robot_description/meshes/collision/${prefix}_shank_link.stl"/>
+          <box size="0.015 0.015 0.10"/>
         </geometry>
       </collision>
       <xacro:inertial_box mass="0.08" x="0.02" y="0.02" z="0.115">
@@ -86,21 +89,22 @@
       <origin xyz="${knee_xyz}" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
       <limit lower="0.0" upper="2.617" effort="2.0" velocity="5.0"/>
-      <dynamics damping="0.01" friction="0.0"/>
+      <dynamics damping="0.05" friction="0.0"/>
     </joint>
 
     <link name="${prefix}_foot_link">
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://dog_robot_description/meshes/visual/${prefix}_foot_link.stl"/>
+          <mesh filename="file://$(find dog_robot_description)/meshes/visual/${prefix}_foot_link.stl"/>
         </geometry>
         <material name="dark_grey"/>
       </visual>
+      <!-- Sphere collision (mesh foot caused ODE contact instability). -->
       <collision>
-        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <origin xyz="0.042 0 -0.029" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://dog_robot_description/meshes/collision/${prefix}_foot_link.stl"/>
+          <sphere radius="0.018"/>
         </geometry>
       </collision>
       <xacro:inertial_sphere mass="0.02" radius="0.015">
