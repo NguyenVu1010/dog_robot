@@ -1,45 +1,26 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="dog_robot_leg">
 
-  <!--
-    Joint origins are measured from CAD (see scripts/compute_joints.py).
-
-    CHAMP-IK-compatible surgery:
-      - thigh_pitch joint frame is rotated by Ry(thigh_rpy) so the
-        knee_xyz lies along -Z (kills ik_alpha bias term).
-      - knee_pitch joint frame is rotated by Ry(knee_rpy) so the
-        foot_xyz lies along -Z (kills ik_beta bias term).
-      - Visual meshes get compensating Ry rotations so the rendered
-        geometry still matches the original CAD pose.
-      - Collision boxes on thigh/shank are reset to xyz=0 rpy=0; the
-        original z-offset was tuned for the un-rotated frame and is
-        not worth re-deriving (boxes are small and approximately
-        symmetric about link origin).
-      - Foot collision sphere xyz must be passed in already expressed
-        in the rotated foot_link frame.
-  -->
   <xacro:macro name="leg" params="prefix
-                                  hip_xyz thigh_xyz knee_xyz foot_xyz
-                                  thigh_rpy:=0 knee_rpy:=0
-                                  mesh_thigh_rpy:=0 mesh_shank_rpy:=0 mesh_foot_rpy:=0
-                                  foot_sphere_xyz:='0.042 0 -0.029'">
+                                  base_to_hip_xyz base_to_hip_rpy
+                                  L_hh L_th L_sh
+                                  mesh_hip_xyz mesh_hip_rpy
+                                  mesh_thigh_xyz mesh_thigh_rpy
+                                  mesh_shank_xyz mesh_shank_rpy
+                                  mesh_foot_xyz mesh_foot_rpy
+                                  foot_sphere_xyz:='0 0 0'">
 
     <link name="${prefix}_hip_link">
       <visual>
-        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <origin xyz="${mesh_hip_xyz}" rpy="${mesh_hip_rpy}"/>
         <geometry>
           <mesh filename="package://dog_robot_description/meshes/visual/${prefix}_hip_link.stl"/>
         </geometry>
         <material name="grey"/>
       </visual>
-      <!-- Small box collision keeps ODE physics active on this branch.
-           Self-collisions are disabled in gazebo.xacro so legs don't
-           prop the body up. -->
       <collision>
         <origin xyz="0 0 0" rpy="0 0 0"/>
-        <geometry>
-          <box size="0.03 0.03 0.03"/>
-        </geometry>
+        <geometry><box size="0.03 0.03 0.03"/></geometry>
       </collision>
       <xacro:inertial_box mass="0.15" x="0.04" y="0.04" z="0.04">
         <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -49,15 +30,15 @@
     <joint name="${prefix}_hip_yaw" type="revolute">
       <parent link="base_link"/>
       <child link="${prefix}_hip_link"/>
-      <origin xyz="${hip_xyz}" rpy="0 0 0"/>
-      <axis xyz="1 0 0"/>
+      <origin xyz="${base_to_hip_xyz}" rpy="${base_to_hip_rpy}"/>
+      <axis xyz="0 0 1"/>
       <limit lower="-0.785" upper="0.785" effort="5.0" velocity="8.0"/>
       <dynamics damping="0.05" friction="0.0"/>
     </joint>
 
     <link name="${prefix}_thigh_link">
       <visual>
-        <origin xyz="0 0 0" rpy="0 ${mesh_thigh_rpy} 0"/>
+        <origin xyz="${mesh_thigh_xyz}" rpy="${mesh_thigh_rpy}"/>
         <geometry>
           <mesh filename="package://dog_robot_description/meshes/visual/${prefix}_thigh_link.stl"/>
         </geometry>
@@ -65,9 +46,7 @@
       </visual>
       <collision>
         <origin xyz="0 0 0" rpy="0 0 0"/>
-        <geometry>
-          <box size="0.02 0.02 0.08"/>
-        </geometry>
+        <geometry><box size="0.02 0.02 0.08"/></geometry>
       </collision>
       <xacro:inertial_box mass="0.10" x="0.03" y="0.03" z="0.10">
         <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -77,15 +56,15 @@
     <joint name="${prefix}_thigh_pitch" type="revolute">
       <parent link="${prefix}_hip_link"/>
       <child link="${prefix}_thigh_link"/>
-      <origin xyz="${thigh_xyz}" rpy="0 ${thigh_rpy} 0"/>
-      <axis xyz="0 1 0"/>
-      <limit lower="-2.5" upper="2.5" effort="5.0" velocity="8.0"/>
+      <origin xyz="${L_hh} 0 0" rpy="-1.5707963 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="-1.571" upper="1.571" effort="5.0" velocity="8.0"/>
       <dynamics damping="0.05" friction="0.0"/>
     </joint>
 
     <link name="${prefix}_shank_link">
       <visual>
-        <origin xyz="0 0 0" rpy="0 ${mesh_shank_rpy} 0"/>
+        <origin xyz="${mesh_shank_xyz}" rpy="${mesh_shank_rpy}"/>
         <geometry>
           <mesh filename="package://dog_robot_description/meshes/visual/${prefix}_shank_link.stl"/>
         </geometry>
@@ -93,9 +72,7 @@
       </visual>
       <collision>
         <origin xyz="0 0 0" rpy="0 0 0"/>
-        <geometry>
-          <box size="0.015 0.015 0.10"/>
-        </geometry>
+        <geometry><box size="0.015 0.015 0.10"/></geometry>
       </collision>
       <xacro:inertial_box mass="0.08" x="0.02" y="0.02" z="0.115">
         <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -105,27 +82,23 @@
     <joint name="${prefix}_knee_pitch" type="revolute">
       <parent link="${prefix}_thigh_link"/>
       <child link="${prefix}_shank_link"/>
-      <origin xyz="${knee_xyz}" rpy="0 ${knee_rpy} 0"/>
-      <axis xyz="0 1 0"/>
-      <limit lower="-2.5" upper="2.5" effort="5.0" velocity="8.0"/>
+      <origin xyz="${L_th} 0 0" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="0.0" upper="2.617" effort="5.0" velocity="8.0"/>
       <dynamics damping="0.05" friction="0.0"/>
     </joint>
 
     <link name="${prefix}_foot_link">
       <visual>
-        <origin xyz="0 0 0" rpy="0 ${mesh_foot_rpy} 0"/>
+        <origin xyz="${mesh_foot_xyz}" rpy="${mesh_foot_rpy}"/>
         <geometry>
           <mesh filename="package://dog_robot_description/meshes/visual/${prefix}_foot_link.stl"/>
         </geometry>
         <material name="dark_grey"/>
       </visual>
-      <!-- Sphere collision (mesh foot caused ODE contact instability).
-           foot_sphere_xyz is expressed in the rotated foot_link frame. -->
       <collision>
         <origin xyz="${foot_sphere_xyz}" rpy="0 0 0"/>
-        <geometry>
-          <sphere radius="0.018"/>
-        </geometry>
+        <geometry><sphere radius="0.018"/></geometry>
       </collision>
       <xacro:inertial_sphere mass="0.02" radius="0.015">
         <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -135,7 +108,7 @@
     <joint name="${prefix}_foot_fixed" type="fixed">
       <parent link="${prefix}_shank_link"/>
       <child link="${prefix}_foot_link"/>
-      <origin xyz="${foot_xyz}" rpy="0 0 0"/>
+      <origin xyz="${L_sh} 0 0" rpy="0 0 0"/>
     </joint>
 
   </xacro:macro>
