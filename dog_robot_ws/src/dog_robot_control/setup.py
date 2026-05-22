@@ -27,6 +27,7 @@ setup(
     entry_points={
         "console_scripts": [
             "teleop_keyboard = dog_robot_control.teleop_keyboard:main",
+            "stand_controller = dog_robot_control.stand_controller:main",
         ],
     },
 )
