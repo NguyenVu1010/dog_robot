@@ -24,24 +24,11 @@ joint_trajectory_controller:
       - BR_thigh_pitch
       - BR_knee_pitch
     command_interfaces:
-      - effort
+      - position
     state_interfaces:
       - position
       - velocity
     state_publish_rate: 50.0
     action_monitor_rate: 20.0
     allow_partial_joints_goal: true
-    open_loop_control: false
-    gains:
-      FL_hip_yaw:     { p: 30.0, i: 0.1, d: 1.0, i_clamp: 1.0 }
-      FL_thigh_pitch: { p: 40.0, i: 0.1, d: 1.5, i_clamp: 1.0 }
-      FL_knee_pitch:  { p: 40.0, i: 0.1, d: 1.5, i_clamp: 1.0 }
-      FR_hip_yaw:     { p: 30.0, i: 0.1, d: 1.0, i_clamp: 1.0 }
-      FR_thigh_pitch: { p: 40.0, i: 0.1, d: 1.5, i_clamp: 1.0 }
-      FR_knee_pitch:  { p: 40.0, i: 0.1, d: 1.5, i_clamp: 1.0 }
-      BL_hip_yaw:     { p: 30.0, i: 0.1, d: 1.0, i_clamp: 1.0 }
-      BL_thigh_pitch: { p: 40.0, i: 0.1, d: 1.5, i_clamp: 1.0 }
-      BL_knee_pitch:  { p: 40.0, i: 0.1, d: 1.5, i_clamp: 1.0 }
-      BR_hip_yaw:     { p: 30.0, i: 0.1, d: 1.0, i_clamp: 1.0 }
-      BR_thigh_pitch: { p: 40.0, i: 0.1, d: 1.5, i_clamp: 1.0 }
-      BR_knee_pitch:  { p: 40.0, i: 0.1, d: 1.5, i_clamp: 1.0 }
+    open_loop_control: true

@@ -32,8 +32,8 @@
       <child link="${prefix}_hip_link"/>
       <origin xyz="${base_to_hip_xyz}" rpy="${base_to_hip_rpy}"/>
       <axis xyz="0 0 1"/>
-      <limit lower="-0.785" upper="0.785" effort="5.0" velocity="8.0"/>
-      <dynamics damping="0.05" friction="0.0"/>
+      <limit lower="-0.785" upper="0.785" effort="10.0" velocity="8.0"/>
+      <dynamics damping="0.5" friction="0.0"/>
     </joint>
 
     <link name="${prefix}_thigh_link">
@@ -58,8 +58,8 @@
       <child link="${prefix}_thigh_link"/>
       <origin xyz="${L_hh} 0 0" rpy="-1.5707963 0 0"/>
       <axis xyz="0 0 1"/>
-      <limit lower="-1.571" upper="1.571" effort="5.0" velocity="8.0"/>
-      <dynamics damping="0.05" friction="0.0"/>
+      <limit lower="-1.571" upper="1.571" effort="10.0" velocity="8.0"/>
+      <dynamics damping="0.5" friction="0.0"/>
     </joint>
 
     <link name="${prefix}_shank_link">
@@ -84,8 +84,8 @@
       <child link="${prefix}_shank_link"/>
       <origin xyz="${L_th} 0 0" rpy="0 0 0"/>
       <axis xyz="0 0 1"/>
-      <limit lower="0.0" upper="2.617" effort="5.0" velocity="8.0"/>
-      <dynamics damping="0.05" friction="0.0"/>
+      <limit lower="0.0" upper="2.617" effort="10.0" velocity="8.0"/>
+      <dynamics damping="0.5" friction="0.0"/>
     </joint>
 
     <link name="${prefix}_foot_link">

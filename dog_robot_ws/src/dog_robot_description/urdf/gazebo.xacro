@@ -46,9 +46,15 @@
     <self_collide>false</self_collide>
   </gazebo>
 
+  <!-- controllers_yaml_path can be overridden at xacro time; falls back to
+       the CHAMP ros_control.yaml so the dog_robot_config/launch/gazebo.launch.py
+       path continues to work unchanged. -->
+  <xacro:arg name="controllers_yaml_path"
+             default="$(find dog_robot_config)/config/ros_control/ros_control.yaml"/>
+
   <gazebo>
     <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
-      <parameters>$(find dog_robot_config)/config/ros_control/ros_control.yaml</parameters>
+      <parameters>$(arg controllers_yaml_path)</parameters>
     </plugin>
   </gazebo>
 
