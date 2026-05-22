@@ -64,3 +64,16 @@ def test_ik_unreachable_raises():
     far = np.array([5.0, 0.0, 0.0])
     with pytest.raises(ValueError):
         ik_leg(DH, far)
+
+# --- Task 4 leg_config tests ---
+from dog_robot_control.leg_config import LEGS, get_leg
+
+def test_legs_table_has_4_entries():
+    assert len(LEGS) == 4
+    assert {L.name for L in LEGS} == {"FL", "FR", "BL", "BR"}
+
+def test_mirror_signs_match_side():
+    assert get_leg("FL").mirror == +1
+    assert get_leg("FR").mirror == -1
+    assert get_leg("BL").mirror == +1
+    assert get_leg("BR").mirror == -1
