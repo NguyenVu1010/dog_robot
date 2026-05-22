@@ -43,3 +43,35 @@ def fk_leg(dh: DHParams, theta: Tuple[float, float, float]) -> np.ndarray:
     AF = mdh_transform(0.0,        dh.L_sh, 0.0, 0.0)
     T = A1 @ A2 @ A3 @ AF
     return T[:3, 3]
+
+
+def ik_leg(dh: DHParams, foot_h: np.ndarray, knee_direction: int = +1) -> Tuple[float, float, float]:
+    """Closed-form inverse kinematics for one 3-DOF leg.
+
+    foot_h: foot target in hip frame H, shape (3,).
+    knee_direction: +1 or -1 — chooses elbow-up vs elbow-down branch.
+    Returns (theta_hip, theta_thigh, theta_knee). Raises ValueError if unreachable.
+    """
+    x, y, z = float(foot_h[0]), float(foot_h[1]), float(foot_h[2])
+
+    if abs(x) < 1e-12 and abs(y) < 1e-12:
+        raise ValueError("foot on hip yaw axis: theta_hip undefined")
+    theta_hip = np.arctan2(y, x)
+
+    r = np.hypot(x, y)
+    a_t = r - dh.L_hh
+    b_t = -z  # alpha=-pi/2 in A2 negates z in the hip frame vs. the planar leg plane
+
+    dist_sq = a_t * a_t + b_t * b_t
+    cos_knee = (dist_sq - dh.L_th**2 - dh.L_sh**2) / (2.0 * dh.L_th * dh.L_sh)
+    if cos_knee > 1.0 + 1e-9 or cos_knee < -1.0 - 1e-9:
+        raise ValueError(f"foot out of reach: dist={np.sqrt(dist_sq):.4f} m, "
+                         f"max={dh.L_th + dh.L_sh:.4f} m")
+    cos_knee = float(np.clip(cos_knee, -1.0, 1.0))
+    theta_knee = knee_direction * np.arccos(cos_knee)
+    theta_thigh = (
+        np.arctan2(b_t, a_t)
+        - np.arctan2(dh.L_sh * np.sin(theta_knee),
+                     dh.L_th + dh.L_sh * np.cos(theta_knee))
+    )
+    return (float(theta_hip), float(theta_thigh), float(theta_knee))

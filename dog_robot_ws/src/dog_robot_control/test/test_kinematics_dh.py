@@ -24,3 +24,43 @@ def test_fk_at_zero_angles_extends_along_x_h():
     foot = fk_leg(DH, (0.0, 0.0, 0.0))
     expected = np.array([DH.L_hh + DH.L_th + DH.L_sh, 0.0, 0.0])
     assert np.allclose(foot, expected, atol=1e-9)
+
+# --- Task 3 IK tests ---
+from dog_robot_control.kinematics_dh import ik_leg
+
+JOINT_LIMITS = {
+    "hip":   (-0.785, 0.785),
+    "thigh": (-1.571, 1.571),
+    "knee":  (0.0,    2.617),
+}
+
+def test_ik_at_stand_pose_recovers_zero_hip():
+    target = np.array([DH.L_hh + DH.L_th + DH.L_sh - 0.012, 0.0, 0.0])
+    theta = ik_leg(DH, target, knee_direction=+1)
+    assert abs(theta[0]) < 1e-9
+    foot_back = fk_leg(DH, theta)
+    assert np.allclose(foot_back, target, atol=1e-9)
+
+def test_fk_ik_roundtrip_random():
+    rng = np.random.default_rng(seed=42)
+    n_ok = 0
+    for _ in range(200):
+        theta = (
+            rng.uniform(*JOINT_LIMITS["hip"]),
+            rng.uniform(-0.6, 0.6),
+            rng.uniform(0.3, 1.8),
+        )
+        foot = fk_leg(DH, theta)
+        try:
+            theta_back = ik_leg(DH, foot, knee_direction=+1)
+        except ValueError:
+            continue
+        foot_again = fk_leg(DH, theta_back)
+        assert np.allclose(foot, foot_again, atol=1e-6), (theta, foot, theta_back, foot_again)
+        n_ok += 1
+    assert n_ok > 150, f"roundtrip succeeded for only {n_ok}/200 samples"
+
+def test_ik_unreachable_raises():
+    far = np.array([5.0, 0.0, 0.0])
+    with pytest.raises(ValueError):
+        ik_leg(DH, far)
