@@ -1,4 +1,13 @@
-"""dog_robot CHAMP gazebo bringup. Adapted from champ_config."""
+"""DEPRECATED — old CHAMP-based launch.
+
+Walking was previously driven via CHAMP's IK. With the DH conversion
+(2026-05-23) the kinematics module moved to dog_robot_control; CHAMP IK
+is no longer used. Walking is a follow-up plan — when that plan ships,
+this file will either be deleted or replaced with a new gait_controller
+launch.
+
+Use `ros2 launch dog_robot_control stand.launch.py` for stand-only sim.
+"""
 import os
 
 from ament_index_python.packages import get_package_share_directory
