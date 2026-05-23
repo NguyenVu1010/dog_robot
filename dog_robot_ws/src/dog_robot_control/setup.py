@@ -28,6 +28,7 @@ setup(
         "console_scripts": [
             "teleop_keyboard = dog_robot_control.teleop_keyboard:main",
             "stand_controller = dog_robot_control.stand_controller:main",
+            "walker_controller = dog_robot_control.walker_controller:main",
         ],
     },
 )
