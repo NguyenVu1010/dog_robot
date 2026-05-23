@@ -77,3 +77,49 @@ cd src/dog_robot_control && python3 -m pytest test/
 
 Tests check FK/IK roundtrip (200 random configs) and URDF chain ↔ kinematics
 module agreement on 40 random joint angle sets across all four legs.
+
+## Walking
+
+`walker_controller` is the production controller. It subsumes the older
+`stand_controller`: when `/cmd_vel` is zero, the walker holds the stand pose;
+non-zero `/cmd_vel` triggers a trot gait (Bernstein-Bezier swing + linear
+stance) computed entirely in Python and converted to joint commands via the
+DH-IK module.
+
+### Launch
+
+```bash
+bash dog_robot_ws/scripts/dog_kill_all.sh
+ros2 launch dog_robot_control walk.launch.py
+```
+
+Robot ramps to stand within 3 s. Then:
+
+```bash
+ros2 topic pub /cmd_vel geometry_msgs/Twist '{linear: {x: 0.1}}' -r 10
+```
+
+Twist field map:
+- `linear.x` — forward / backward (m/s), capped at `gait.max_linear_velocity_x`
+- `linear.y` — sideways (m/s)
+- `angular.z` — yaw (rad/s)
+
+Set all to zero (or stop publishing — there is a 0.5 s timeout) to stop.
+
+### Gait config
+
+`dog_robot_control/config/walker_params.yaml` exposes tunable gait params
+(stance duration, swing height, velocity caps, knee direction, etc.). See
+inline comments in the YAML.
+
+### Architecture
+
+`/cmd_vel` → `BodyController.pose_command` → `LegController.velocity_command`
+(phase_generator + trajectory_planner per leg) → for each leg: rotate to DH
+hip frame → `ik_leg` → `JointTrajectory` → joint_trajectory_controller →
+Gazebo. Python module layout: `dog_robot_control/dog_robot_control/gait/`.
+
+### Deprecated
+
+`stand_controller` + `stand.launch.py` remain in the tree for reference but
+are deprecated. Use the walker.

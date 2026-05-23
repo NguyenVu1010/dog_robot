@@ -1,12 +1,8 @@
-"""Stand-only controller for dog_robot.
+"""DEPRECATED — superseded by walker_controller (2026-05-24).
 
-Workflow:
-  1. Wait for first /joint_states message; record current angles.
-  2. Compute target joint angles for default stand pose using DH IK.
-  3. Linearly interpolate (current -> target) over ramp_time seconds.
-  4. Publish JointTrajectory at publish_rate to /joint_trajectory_controller/joint_trajectory.
-  5. After ramp completes, hold target. Subscribe /stand_cmd (geometry_msgs/Pose)
-     to update target body height (z) on the fly; orientation ignored in v1.
+walker_controller does everything this node does (stand pose at default
+height) plus walking via /cmd_vel. Kept here for backward compat with
+stand.launch.py; will be deleted in a future cleanup.
 """
 import math
 from typing import Optional

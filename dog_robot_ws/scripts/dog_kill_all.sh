@@ -12,7 +12,8 @@ PATTERNS=(
   robot_state_publisher joint_state_broadcaster
   joint_trajectory_controller controller_manager
   ros2_control_node ros2_control gazebo_ros2_control
-  stand_controller rviz2 champ_base champ_gazebo
+  stand_controller walker_controller rviz2
+  champ_base champ_gazebo
 )
 
 for p in "${PATTERNS[@]}"; do pkill    -f "$p"; done
