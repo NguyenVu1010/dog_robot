@@ -4,17 +4,13 @@
   <xacro:macro name="leg" params="prefix
                                   base_to_hip_xyz base_to_hip_rpy
                                   L_hh L_th L_sh
-                                  mesh_hip_xyz mesh_hip_rpy
-                                  mesh_thigh_xyz mesh_thigh_rpy
-                                  mesh_shank_xyz mesh_shank_rpy
-                                  mesh_foot_xyz mesh_foot_rpy
                                   foot_sphere_xyz:='0 0 0'">
 
     <link name="${prefix}_hip_link">
       <visual>
-        <origin xyz="${mesh_hip_xyz}" rpy="${mesh_hip_rpy}"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://dog_robot_description/meshes/visual/${prefix}_hip_link.stl"/>
+          <mesh filename="package://dog_robot_description/meshes/visual_dh/${prefix}_hip_link.stl"/>
         </geometry>
         <material name="grey"/>
       </visual>
@@ -38,9 +34,9 @@
 
     <link name="${prefix}_thigh_link">
       <visual>
-        <origin xyz="${mesh_thigh_xyz}" rpy="${mesh_thigh_rpy}"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://dog_robot_description/meshes/visual/${prefix}_thigh_link.stl"/>
+          <mesh filename="package://dog_robot_description/meshes/visual_dh/${prefix}_thigh_link.stl"/>
         </geometry>
         <material name="dark_grey"/>
       </visual>
@@ -64,9 +60,9 @@
 
     <link name="${prefix}_shank_link">
       <visual>
-        <origin xyz="${mesh_shank_xyz}" rpy="${mesh_shank_rpy}"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://dog_robot_description/meshes/visual/${prefix}_shank_link.stl"/>
+          <mesh filename="package://dog_robot_description/meshes/visual_dh/${prefix}_shank_link.stl"/>
         </geometry>
         <material name="grey"/>
       </visual>
@@ -90,9 +86,9 @@
 
     <link name="${prefix}_foot_link">
       <visual>
-        <origin xyz="${mesh_foot_xyz}" rpy="${mesh_foot_rpy}"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://dog_robot_description/meshes/visual/${prefix}_foot_link.stl"/>
+          <mesh filename="package://dog_robot_description/meshes/visual_dh/${prefix}_foot_link.stl"/>
         </geometry>
         <material name="dark_grey"/>
       </visual>
