@@ -75,20 +75,22 @@ L_HH, L_TH, L_SH = 0.02553, 0.11725, 0.07043
 def main():
     for leg in ("FL", "FR", "BL", "BR"):
         O = OLD[leg]
-        T_old_hip   = urdf_origin(O["hip_xyz"],   O["hip_rpy"])
-        T_old_thigh = urdf_origin(O["thigh_xyz"], O["thigh_rpy"])
-        T_old_shank = urdf_origin(O["knee_xyz"],  O["knee_rpy"])
-        T_old_foot  = urdf_origin(O["foot_xyz"],  O["foot_rpy"])
+        # Old chain in WORLD (= base_link) frame, joints at 0.
+        T_old_hip_w   = urdf_origin(O["hip_xyz"],   O["hip_rpy"])
+        T_old_thigh_w = T_old_hip_w   @ urdf_origin(O["thigh_xyz"], O["thigh_rpy"])
+        T_old_shank_w = T_old_thigh_w @ urdf_origin(O["knee_xyz"],  O["knee_rpy"])
+        T_old_foot_w  = T_old_shank_w @ urdf_origin(O["foot_xyz"],  O["foot_rpy"])
 
-        T_new_hip   = urdf_origin(O["hip_xyz"], NEW_HIP_RPY[leg])
-        T_new_thigh = urdf_origin((L_HH, 0, 0), (-PI_2, 0, 0))
-        T_new_shank = urdf_origin((L_TH, 0, 0), (0, 0, 0))
-        T_new_foot  = urdf_origin((L_SH, 0, 0), (0, 0, 0))
+        # New chain in WORLD frame, joints at 0.
+        T_new_hip_w   = urdf_origin(O["hip_xyz"], NEW_HIP_RPY[leg])
+        T_new_thigh_w = T_new_hip_w   @ urdf_origin((L_HH, 0, 0), (-PI_2, 0, 0))
+        T_new_shank_w = T_new_thigh_w @ urdf_origin((L_TH, 0, 0), (0, 0, 0))
+        T_new_foot_w  = T_new_shank_w @ urdf_origin((L_SH, 0, 0), (0, 0, 0))
 
-        comp_hip   = np.linalg.inv(T_new_hip)   @ T_old_hip
-        comp_thigh = np.linalg.inv(T_new_thigh) @ T_old_thigh
-        comp_shank = np.linalg.inv(T_new_shank) @ T_old_shank
-        comp_foot  = np.linalg.inv(T_new_foot)  @ T_old_foot
+        comp_hip   = np.linalg.inv(T_new_hip_w)   @ T_old_hip_w
+        comp_thigh = np.linalg.inv(T_new_thigh_w) @ T_old_thigh_w
+        comp_shank = np.linalg.inv(T_new_shank_w) @ T_old_shank_w
+        comp_foot  = np.linalg.inv(T_new_foot_w)  @ T_old_foot_w
 
         def fmt(T, name):
             xyz = tuple(round(v, 5) for v in T[:3, 3])
