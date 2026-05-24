@@ -14,8 +14,8 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
-from dog_robot_control.kinematics_dh import DHParams, ik_leg
-from dog_robot_control.leg_config import LEGS
+from dog_robot_kinematics.kinematics_dh import DHParams, ik_leg
+from dog_robot_kinematics.leg_config import LEGS
 
 
 def Rx(a): c,s=math.cos(a),math.sin(a); return np.array([[1,0,0],[0,c,-s],[0,s,c]])

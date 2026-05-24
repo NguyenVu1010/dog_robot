@@ -9,8 +9,8 @@ import math
 import numpy as np
 import pytest
 
-from dog_robot_control.kinematics_dh import DHParams, ik_leg
-from dog_robot_control.leg_config import LEGS
+from dog_robot_kinematics.kinematics_dh import DHParams, ik_leg
+from dog_robot_kinematics.leg_config import LEGS
 from dog_robot_control.gait.gait_config import GaitConfig
 from dog_robot_control.gait.body_controller import BodyController, BodyPose
 from dog_robot_control.gait.leg_controller import LegController, Velocity

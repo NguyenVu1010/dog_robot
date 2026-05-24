@@ -14,8 +14,8 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
-from dog_robot_control.kinematics_dh import DHParams, ik_leg
-from dog_robot_control.leg_config import LEGS
+from dog_robot_kinematics.kinematics_dh import DHParams, ik_leg
+from dog_robot_kinematics.leg_config import LEGS
 from dog_robot_control.gait.gait_config import GaitConfig
 from dog_robot_control.gait.body_controller import BodyController, BodyPose
 from dog_robot_control.gait.leg_controller import LegController, Velocity
@@ -58,6 +58,7 @@ class WalkerController(Node):
         self.declare_parameter("stand.publish_rate", 50.0)
         self.declare_parameter("stand.knee_direction", 1)
         self.declare_parameter("joint_order", DEFAULT_JOINT_ORDER)
+        self.declare_parameter("kinematic_mode", False)
 
         dh = DHParams(
             L_hh=self.get_parameter("dh.L_hh").value,
@@ -79,6 +80,7 @@ class WalkerController(Node):
         self.cmd_timeout = float(self.get_parameter("stand.cmd_vel_timeout").value)
         rate = float(self.get_parameter("stand.publish_rate").value)
         self.joint_order = list(self.get_parameter("joint_order").value)
+        self.kinematic_mode = bool(self.get_parameter("kinematic_mode").value)
 
         self.body_controller = BodyController(LEGS, dh, self.gait)
         self.leg_controller = LegController(LEGS, dh, self.gait)
@@ -92,12 +94,23 @@ class WalkerController(Node):
         self.ramp_start_t: Optional[float] = None
         self.ramp_done = False
 
-        self.pub = self.create_publisher(
-            JointTrajectory, "/joint_trajectory_controller/joint_trajectory", 10
-        )
-        self.sub_js = self.create_subscription(
-            JointState, "/joint_states", self._on_js, 10
-        )
+        if self.kinematic_mode:
+            self.pub_js = self.create_publisher(JointState, "/joint_states", 10)
+            self.pub = None
+            # No hardware to read from; seed start_angles = stand_target so the
+            # ramp is a no-op and the first tick publishes a valid pose.
+            self.start_angles = self._compute_stand_target()
+            self.ramp_target = self.start_angles.copy()
+            self.ramp_start_t = 0.0
+            self.ramp_done = True
+        else:
+            self.pub = self.create_publisher(
+                JointTrajectory, "/joint_trajectory_controller/joint_trajectory", 10
+            )
+            self.pub_js = None
+            self.sub_js = self.create_subscription(
+                JointState, "/joint_states", self._on_js, 10
+            )
         self.sub_vel = self.create_subscription(
             Twist, "/cmd_vel", self._on_vel, 10
         )
@@ -105,7 +118,10 @@ class WalkerController(Node):
             Pose, "/stand_cmd", self._on_pose, 10
         )
         self.timer = self.create_timer(1.0 / rate, self._tick)
-        self.get_logger().info("walker_controller up; waiting for /joint_states")
+        if self.kinematic_mode:
+            self.get_logger().info("walker_controller up in kinematic mode (publishing /joint_states)")
+        else:
+            self.get_logger().info("walker_controller up; waiting for /joint_states")
 
     def _now(self) -> float:
         return self.get_clock().now().nanoseconds * 1e-9
@@ -181,14 +197,21 @@ class WalkerController(Node):
                 targets.extend(angles)
             q = np.array(targets)
 
-        msg = JointTrajectory()
-        msg.joint_names = self.joint_order
-        pt = JointTrajectoryPoint()
-        pt.positions = q.tolist()
-        pt.time_from_start.sec = 0
-        pt.time_from_start.nanosec = int(0.1 * 1e9)
-        msg.points = [pt]
-        self.pub.publish(msg)
+        if self.kinematic_mode:
+            js = JointState()
+            js.header.stamp = self.get_clock().now().to_msg()
+            js.name = list(self.joint_order)
+            js.position = q.tolist()
+            self.pub_js.publish(js)
+        else:
+            msg = JointTrajectory()
+            msg.joint_names = self.joint_order
+            pt = JointTrajectoryPoint()
+            pt.positions = q.tolist()
+            pt.time_from_start.sec = 0
+            pt.time_from_start.nanosec = int(0.1 * 1e9)
+            msg.points = [pt]
+            self.pub.publish(msg)
 
 
 def main(args=None):

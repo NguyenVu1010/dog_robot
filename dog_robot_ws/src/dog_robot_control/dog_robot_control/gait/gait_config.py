@@ -3,8 +3,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from dog_robot_control.kinematics_dh import DHParams
-from dog_robot_control.leg_config import LegConfig
+from dog_robot_kinematics.kinematics_dh import DHParams
+from dog_robot_kinematics.leg_config import LegConfig
 
 
 @dataclass(frozen=True)

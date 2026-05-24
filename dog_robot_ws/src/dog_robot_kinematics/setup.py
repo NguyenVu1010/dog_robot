@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 import os
 from glob import glob
 
-package_name = "dog_robot_control"
+package_name = "dog_robot_kinematics"
 
 setup(
     name=package_name,
@@ -12,25 +12,15 @@ setup(
         ("share/ament_index/resource_index/packages",
             ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),
-        (os.path.join("share", package_name, "launch"),
-            glob("launch/*.launch.py")),
         (os.path.join("share", package_name, "config"),
             glob("config/*.yaml")),
-        (os.path.join("share", package_name, "rviz"),
-            glob("rviz/*.rviz")),
     ],
     install_requires=["setuptools", "numpy"],
     zip_safe=True,
     maintainer="nguyenvd",
     maintainer_email="nguyenvd11@fpt.com",
-    description="ROS2 controller node for dog robot",
+    description="DH kinematics module + kinematic-only RViz launch for dog_robot.",
     license="MIT",
     tests_require=["pytest"],
-    entry_points={
-        "console_scripts": [
-            "teleop_keyboard = dog_robot_control.teleop_keyboard:main",
-            "stand_controller = dog_robot_control.stand_controller:main",
-            "walker_controller = dog_robot_control.walker_controller:main",
-        ],
-    },
+    entry_points={"console_scripts": []},
 )

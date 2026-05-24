@@ -9,8 +9,8 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import pytest
 
-from dog_robot_control.kinematics_dh import DHParams, fk_leg
-from dog_robot_control.leg_config import LEGS
+from dog_robot_kinematics.kinematics_dh import DHParams, fk_leg
+from dog_robot_kinematics.leg_config import LEGS
 
 DH = DHParams(L_hh=0.02553, L_th=0.11725, L_sh=0.07043)
 TOL = 1e-4   # meters

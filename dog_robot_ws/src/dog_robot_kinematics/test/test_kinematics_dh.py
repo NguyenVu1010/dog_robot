@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from dog_robot_control.kinematics_dh import DHParams, mdh_transform, fk_leg
+from dog_robot_kinematics.kinematics_dh import DHParams, mdh_transform, fk_leg
 
 DH = DHParams(L_hh=0.02553, L_th=0.11725, L_sh=0.07043)
 
@@ -26,7 +26,7 @@ def test_fk_at_zero_angles_extends_along_x_h():
     assert np.allclose(foot, expected, atol=1e-9)
 
 # --- Task 3 IK tests ---
-from dog_robot_control.kinematics_dh import ik_leg
+from dog_robot_kinematics.kinematics_dh import ik_leg
 
 JOINT_LIMITS = {
     "hip":   (-0.785, 0.785),
@@ -66,7 +66,7 @@ def test_ik_unreachable_raises():
         ik_leg(DH, far)
 
 # --- Task 4 leg_config tests ---
-from dog_robot_control.leg_config import LEGS, get_leg
+from dog_robot_kinematics.leg_config import LEGS, get_leg
 
 def test_legs_table_has_4_entries():
     assert len(LEGS) == 4
