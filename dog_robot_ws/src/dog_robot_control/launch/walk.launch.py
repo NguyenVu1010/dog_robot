@@ -1,4 +1,6 @@
 """Walking launch: Gazebo + spawn dog_robot + JTC + walker_controller."""
+import os
+
 from launch import LaunchDescription
 from launch.actions import (ExecuteProcess, IncludeLaunchDescription,
                             RegisterEventHandler)
@@ -10,6 +12,11 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
+    # Disable Gazebo's online model database fetch BEFORE spawning gzclient/gzserver.
+    # Default URI points to gazebosim.org/models; an unreachable host stalls
+    # gzclient at "preparing world" for the full TCP SYN timeout (~75s+).
+    os.environ["GAZEBO_MODEL_DATABASE_URI"] = ""
+
     descr = FindPackageShare("dog_robot_description")
     ctrl = FindPackageShare("dog_robot_control")
 
