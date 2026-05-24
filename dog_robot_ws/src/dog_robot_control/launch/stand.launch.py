@@ -44,11 +44,13 @@ def generate_launch_description():
         output="screen",
     )
 
+    # Spawn just above the fully-extended leg height (foot touches ground
+    # immediately at zero joint angles). No free-fall impact.
     spawn = Node(
         package="gazebo_ros",
         executable="spawn_entity.py",
         arguments=["-topic", "robot_description", "-entity", "dog_robot",
-                   "-z", "0.30", "-timeout", "120"],
+                   "-z", "0.18", "-timeout", "120"],
         output="screen",
     )
 

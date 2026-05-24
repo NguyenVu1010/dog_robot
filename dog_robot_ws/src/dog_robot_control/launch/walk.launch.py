@@ -44,11 +44,15 @@ def generate_launch_description():
         output="screen",
     )
 
+    # Spawn just above the fully-extended leg height (hip_z=0.035 +
+    # L_total=0.213 = 0.248). At z=0.18, foot at zero joint angles touches
+    # ground immediately (0.18 + 0.035 - 0.213 ≈ 0). No free-fall impact;
+    # walker_controller then ramps legs into the bent stand pose.
     spawn = Node(
         package="gazebo_ros",
         executable="spawn_entity.py",
         arguments=["-topic", "robot_description", "-entity", "dog_robot",
-                   "-z", "0.30", "-timeout", "120"],
+                   "-z", "0.18", "-timeout", "120"],
         output="screen",
     )
 
