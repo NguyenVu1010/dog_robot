@@ -39,9 +39,9 @@
              base_to_hip_rpy="0 1.5707963 0"
              L_hh="${L_hh}" L_th="${L_th}" L_sh="${L_sh}"
              mesh_hip_xyz="0.0 0.0 0.0" mesh_hip_rpy="0.00000 -1.57080 0.00000"
-             mesh_thigh_xyz="-0.01236 -0.0252 0.02536" mesh_thigh_rpy="1.57080 0.00000 -0.62819"
-             mesh_shank_xyz="-0.06506 0.06367 0.06638" mesh_shank_rpy="1.57080 0.00000 -2.55994"
-             mesh_foot_xyz="-0.09828 0.00708 0.04716" mesh_foot_rpy="1.57080 0.00000 -2.55994"
+             mesh_thigh_xyz="-0.01236 -0.0252 0.02536" mesh_thigh_rpy="1.57080 0.00000 -1.57080"
+             mesh_shank_xyz="-0.06506 0.06367 0.06638" mesh_shank_rpy="1.57080 0.00000 -1.57080"
+             mesh_foot_xyz="-0.09828 0.00708 0.04716" mesh_foot_rpy="1.57080 0.00000 -1.57080"
              foot_sphere_xyz="0 0 0"/>
 
   <xacro:leg prefix="FR"
@@ -49,9 +49,9 @@
              base_to_hip_rpy="0 1.5707963 3.1415927"
              L_hh="${L_hh}" L_th="${L_th}" L_sh="${L_sh}"
              mesh_hip_xyz="0.0 0.0 0.0" mesh_hip_rpy="0.00000 1.57080 -3.14159"
-             mesh_thigh_xyz="-0.01303 0.0252 0.0257" mesh_thigh_rpy="-1.57080 0.00000 0.63382"
-             mesh_shank_xyz="-0.06561 -0.06279 0.0684" mesh_shank_rpy="-1.57080 0.00000 2.54793"
-             mesh_foot_xyz="-0.09799 -0.00641 0.05014" mesh_foot_rpy="-1.57080 0.00000 2.54793"
+             mesh_thigh_xyz="-0.01303 0.0252 0.0257" mesh_thigh_rpy="-1.57080 0.00000 1.57080"
+             mesh_shank_xyz="-0.06561 -0.06279 0.0684" mesh_shank_rpy="-1.57080 0.00000 1.57080"
+             mesh_foot_xyz="-0.09799 -0.00641 0.05014" mesh_foot_rpy="-1.57080 0.00000 1.57080"
              foot_sphere_xyz="0 0 0"/>
 
   <xacro:leg prefix="BL"
@@ -59,9 +59,9 @@
              base_to_hip_rpy="0 1.5707963 0"
              L_hh="${L_hh}" L_th="${L_th}" L_sh="${L_sh}"
              mesh_hip_xyz="0.0 0.0 0.0" mesh_hip_rpy="0.00000 -1.57080 0.00000"
-             mesh_thigh_xyz="-0.01235 0.0252 0.02536" mesh_thigh_rpy="1.57080 0.00000 -0.70929"
-             mesh_shank_xyz="-0.05801 0.10861 0.06618" mesh_shank_rpy="1.57080 0.00000 -2.67417"
-             mesh_foot_xyz="-0.09806 0.04842 0.04712" mesh_foot_rpy="1.57080 0.00000 -2.67417"
+             mesh_thigh_xyz="-0.01235 0.0252 0.02536" mesh_thigh_rpy="1.57080 0.00000 -1.57080"
+             mesh_shank_xyz="-0.05801 0.10861 0.06618" mesh_shank_rpy="1.57080 0.00000 -1.57080"
+             mesh_foot_xyz="-0.09806 0.04842 0.04712" mesh_foot_rpy="1.57080 0.00000 -1.57080"
              foot_sphere_xyz="0 0 0"/>
 
   <xacro:leg prefix="BR"
@@ -69,9 +69,9 @@
              base_to_hip_rpy="0 1.5707963 3.1415927"
              L_hh="${L_hh}" L_th="${L_th}" L_sh="${L_sh}"
              mesh_hip_xyz="0.0 0.0 0.0" mesh_hip_rpy="0.00000 1.57080 -3.14159"
-             mesh_thigh_xyz="-0.01303 -0.0252 0.0257" mesh_thigh_rpy="-1.57080 0.00000 0.70756"
-             mesh_shank_xyz="-0.0593 -0.10819 0.0684" mesh_shank_rpy="-1.57080 0.00000 2.65970"
-             mesh_foot_xyz="-0.09804 -0.04759 0.04998" mesh_foot_rpy="-1.57080 0.00000 2.65970"
+             mesh_thigh_xyz="-0.01303 -0.0252 0.0257" mesh_thigh_rpy="-1.57080 0.00000 1.57080"
+             mesh_shank_xyz="-0.0593 -0.10819 0.0684" mesh_shank_rpy="-1.57080 0.00000 1.57080"
+             mesh_foot_xyz="-0.09804 -0.04759 0.04998" mesh_foot_rpy="-1.57080 0.00000 1.57080"
              foot_sphere_xyz="0 0 0"/>
 
 </robot>

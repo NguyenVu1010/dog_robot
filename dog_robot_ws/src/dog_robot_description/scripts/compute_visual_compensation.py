@@ -46,24 +46,44 @@ def urdf_origin(xyz, rpy_tuple):
     return H(R, np.array(xyz))
 
 
-# Old URDF (committed state, CHAMP-IK surgery applied) – per-leg parameters.
+# Old URDF (CHAMP-era, post-IK surgery). Each leg also carried a per-link
+# visual <origin rpy="0 mesh_*_rpy_old 0"/> that cancelled the joint Ry; the
+# mesh therefore ended up at T_joint_chain @ Ry(mesh_*_rpy_old). We have to
+# carry that Ry through the compensation or the meshes end up off by exactly
+# that angle around Y in the new URDF.
 OLD = {
     "FL": dict(hip_xyz=( 0.07480, 0.04000, 0.03510), hip_rpy=(0,0,0),
                thigh_xyz=( 0.02520, 0.02536,-0.01317), thigh_rpy=(0,0.94261,0),
                knee_xyz=(0.0,0.04102,-0.10984),       knee_rpy=(0,-1.93175,0),
-               foot_xyz=(0.0,-0.01922,-0.06773),      foot_rpy=(0,0,0)),
+               foot_xyz=(0.0,-0.01922,-0.06773),      foot_rpy=(0,0,0),
+               mesh_hip_rpy=(0,0,0),
+               mesh_thigh_rpy=(0,-0.94261,0),
+               mesh_shank_rpy=(0, 0.98914,0),
+               mesh_foot_rpy=(0, 0.98914,0)),
     "FR": dict(hip_xyz=( 0.07480,-0.04000, 0.03510), hip_rpy=(0,0,0),
                thigh_xyz=( 0.02520,-0.02570,-0.01250), thigh_rpy=(0,0.93698,0),
                knee_xyz=(0.0,-0.04270,-0.10920),      knee_rpy=(0,-1.91411,0),
-               foot_xyz=(0.0,0.01826,-0.06802),       foot_rpy=(0,0,0)),
+               foot_xyz=(0.0,0.01826,-0.06802),       foot_rpy=(0,0,0),
+               mesh_hip_rpy=(0,0,0),
+               mesh_thigh_rpy=(0,-0.93698,0),
+               mesh_shank_rpy=(0, 0.97713,0),
+               mesh_foot_rpy=(0, 0.97713,0)),
     "BL": dict(hip_xyz=(-0.07480, 0.04000, 0.03510), hip_rpy=(0,0,0),
                thigh_xyz=(-0.02520, 0.02536,-0.01318), thigh_rpy=(0,0.86151,0),
                knee_xyz=(0.0,0.04082,-0.10992),       knee_rpy=(0,-1.96488,0),
-               foot_xyz=(0.0,-0.01906,-0.06742),      foot_rpy=(0,0,0)),
+               foot_xyz=(0.0,-0.01906,-0.06742),      foot_rpy=(0,0,0),
+               mesh_hip_rpy=(0,0,0),
+               mesh_thigh_rpy=(0,-0.86151,0),
+               mesh_shank_rpy=(0, 1.10337,0),
+               mesh_foot_rpy=(0, 1.10337,0)),
     "BR": dict(hip_xyz=(-0.07480,-0.04000, 0.03510), hip_rpy=(0,0,0),
                thigh_xyz=(-0.02520,-0.02570,-0.01250), thigh_rpy=(0,0.86324,0),
                knee_xyz=(0.0,-0.04270,-0.10920),      knee_rpy=(0,-1.95214,0),
-               foot_xyz=(0.0,0.01842,-0.06838),       foot_rpy=(0,0,0)),
+               foot_xyz=(0.0,0.01842,-0.06838),       foot_rpy=(0,0,0),
+               mesh_hip_rpy=(0,0,0),
+               mesh_thigh_rpy=(0,-0.86324,0),
+               mesh_shank_rpy=(0, 1.08890,0),
+               mesh_foot_rpy=(0, 1.08890,0)),
 }
 
 PI_2 = math.pi / 2
@@ -75,11 +95,18 @@ L_HH, L_TH, L_SH = 0.02553, 0.11725, 0.07043
 def main():
     for leg in ("FL", "FR", "BL", "BR"):
         O = OLD[leg]
-        # Old chain in WORLD (= base_link) frame, joints at 0.
+        # Old chain in WORLD frame, joints at 0. T_old_mesh_*_w is where the
+        # mesh actually rendered in the old URDF (joint chain THEN visual
+        # origin), which is what we have to match in the new URDF.
         T_old_hip_w   = urdf_origin(O["hip_xyz"],   O["hip_rpy"])
         T_old_thigh_w = T_old_hip_w   @ urdf_origin(O["thigh_xyz"], O["thigh_rpy"])
         T_old_shank_w = T_old_thigh_w @ urdf_origin(O["knee_xyz"],  O["knee_rpy"])
         T_old_foot_w  = T_old_shank_w @ urdf_origin(O["foot_xyz"],  O["foot_rpy"])
+
+        T_old_mesh_hip_w   = T_old_hip_w   @ urdf_origin((0,0,0), O["mesh_hip_rpy"])
+        T_old_mesh_thigh_w = T_old_thigh_w @ urdf_origin((0,0,0), O["mesh_thigh_rpy"])
+        T_old_mesh_shank_w = T_old_shank_w @ urdf_origin((0,0,0), O["mesh_shank_rpy"])
+        T_old_mesh_foot_w  = T_old_foot_w  @ urdf_origin((0,0,0), O["mesh_foot_rpy"])
 
         # New chain in WORLD frame, joints at 0.
         T_new_hip_w   = urdf_origin(O["hip_xyz"], NEW_HIP_RPY[leg])
@@ -87,10 +114,10 @@ def main():
         T_new_shank_w = T_new_thigh_w @ urdf_origin((L_TH, 0, 0), (0, 0, 0))
         T_new_foot_w  = T_new_shank_w @ urdf_origin((L_SH, 0, 0), (0, 0, 0))
 
-        comp_hip   = np.linalg.inv(T_new_hip_w)   @ T_old_hip_w
-        comp_thigh = np.linalg.inv(T_new_thigh_w) @ T_old_thigh_w
-        comp_shank = np.linalg.inv(T_new_shank_w) @ T_old_shank_w
-        comp_foot  = np.linalg.inv(T_new_foot_w)  @ T_old_foot_w
+        comp_hip   = np.linalg.inv(T_new_hip_w)   @ T_old_mesh_hip_w
+        comp_thigh = np.linalg.inv(T_new_thigh_w) @ T_old_mesh_thigh_w
+        comp_shank = np.linalg.inv(T_new_shank_w) @ T_old_mesh_shank_w
+        comp_foot  = np.linalg.inv(T_new_foot_w)  @ T_old_mesh_foot_w
 
         def fmt(T, name):
             xyz = tuple(round(v, 5) for v in T[:3, 3])
