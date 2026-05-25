@@ -55,10 +55,11 @@ def _Tx(d: float) -> np.ndarray:
     return T
 
 
-def _T_of(R: np.ndarray, t: np.ndarray = np.zeros(3)) -> np.ndarray:
+def _T_of(R: np.ndarray, t: np.ndarray | None = None) -> np.ndarray:
     T = np.eye(4)
     T[:3, :3] = R
-    T[:3, 3] = t
+    if t is not None:
+        T[:3, 3] = t
     return T
 
 
