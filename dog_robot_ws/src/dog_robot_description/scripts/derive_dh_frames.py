@@ -214,6 +214,106 @@ def mean_mdh_params() -> Dict[str, float]:
     }
 
 
+@dataclass(frozen=True)
+class LinkPlacement:
+    name: str                                # e.g. "FL_hip_link"
+    position_cad_mm: np.ndarray              # (3,)
+    quat_cad: np.ndarray                     # (4,) (x, y, z, w) — FreeCAD convention
+
+
+def quat_to_rotmat(q: np.ndarray) -> np.ndarray:
+    """FreeCAD quaternion (x, y, z, w) -> 3x3 rotation matrix."""
+    x, y, z, w = q
+    n = x*x + y*y + z*z + w*w
+    if n < 1e-12:
+        return np.eye(3)
+    s = 2.0 / n
+    return np.array([
+        [1 - s*(y*y + z*z),  s*(x*y - z*w),    s*(x*z + y*w)],
+        [s*(x*y + z*w),      1 - s*(x*x + z*z), s*(y*z - x*w)],
+        [s*(x*z - y*w),      s*(y*z + x*w),    1 - s*(x*x + y*y)],
+    ])
+
+
+def rotmat_to_quat(R: np.ndarray) -> np.ndarray:
+    """3x3 rotation matrix -> FreeCAD (x, y, z, w) quaternion."""
+    tr = R[0, 0] + R[1, 1] + R[2, 2]
+    if tr > 0:
+        s = math.sqrt(tr + 1.0) * 2
+        w = 0.25 * s
+        x = (R[2, 1] - R[1, 2]) / s
+        y = (R[0, 2] - R[2, 0]) / s
+        z = (R[1, 0] - R[0, 1]) / s
+    elif R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
+        s = math.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2]) * 2
+        w = (R[2, 1] - R[1, 2]) / s
+        x = 0.25 * s
+        y = (R[0, 1] + R[1, 0]) / s
+        z = (R[0, 2] + R[2, 0]) / s
+    elif R[1, 1] > R[2, 2]:
+        s = math.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2]) * 2
+        w = (R[0, 2] - R[2, 0]) / s
+        x = (R[0, 1] + R[1, 0]) / s
+        y = 0.25 * s
+        z = (R[1, 2] + R[2, 1]) / s
+    else:
+        s = math.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1]) * 2
+        w = (R[1, 0] - R[0, 1]) / s
+        x = (R[0, 2] + R[2, 0]) / s
+        y = (R[1, 2] + R[2, 1]) / s
+        z = 0.25 * s
+    return np.array([x, y, z, w])
+
+
+def _link_axes_cad(link_name: str) -> Tuple[np.ndarray, np.ndarray]:
+    """Return (position_cad_mm, R_cad) — Z along joint axis, X toward next joint."""
+    leg, kind = link_name.split("_", 1)
+    if kind == "hip_link":
+        # Z = CAD X (hip axis); X = direction toward thigh joint perpendicular.
+        pos = np.array(MEASURED_HIP_MM[leg])
+        z = np.array([1.0, 0, 0])
+        # X axis = unit vector from hip axis foot to thigh axis (in CAD).
+        thigh = np.array(MEASURED_THIGH_MM[leg])
+        # Perpendicular component of (thigh - pos) wrt z:
+        v = thigh - pos
+        v_perp = v - np.dot(v, z) * z
+        x = v_perp / np.linalg.norm(v_perp)
+    elif kind == "thigh_link":
+        pos = np.array(MEASURED_THIGH_MM[leg])
+        z = np.array([0, 0, 1.0])      # thigh axis = CAD Z
+        knee = np.array(MEASURED_KNEE_MM[leg])
+        v = knee - pos
+        v_perp = v - np.dot(v, z) * z
+        x = v_perp / np.linalg.norm(v_perp)
+    elif kind == "shank_link":
+        pos = np.array(MEASURED_KNEE_MM[leg])
+        z = np.array([0, 0, 1.0])
+        # X toward the foot end. Use measured knee->foot direction; if foot
+        # not measured separately, take the historical shank end direction
+        # from the knee centroid via simple geometry: assume X axis points
+        # along the historic CAD shank axis (negative-Y in CAD body frame).
+        x = np.array([0, -1.0, 0])     # along -CAD Y, the natural shank direction.
+    elif kind == "foot_link":
+        # Foot tip frame: parallel to shank.
+        pos = np.array(MEASURED_KNEE_MM[leg])  # placeholder; updated below
+        z = np.array([0, 0, 1.0])
+        x = np.array([0, -1.0, 0])
+        # Move foot origin a_3 along x from knee.
+        L_sh_mm = 70.43
+        pos = pos + L_sh_mm * x
+    else:
+        raise ValueError(f"unknown link kind: {kind}")
+    y = np.cross(z, x)
+    R = np.column_stack([x, y, z])
+    return pos, R
+
+
+def link_placement_in_cad(link_name: str) -> LinkPlacement:
+    pos, R = _link_axes_cad(link_name)
+    return LinkPlacement(name=link_name, position_cad_mm=pos,
+                          quat_cad=rotmat_to_quat(R))
+
+
 def main() -> None:
     raise NotImplementedError("derive_dh_frames.main: implemented in later tasks")
 

@@ -75,3 +75,14 @@ def test_mean_mdh_params_returns_expected_keys():
         assert k in m, f"missing key {k}"
     assert abs(m["alpha_1"] - (-np.pi/2)) < 1e-9
     assert abs(m["alpha_2"]) < 1e-9
+
+
+def test_link_placement_in_cad_hip_fl():
+    """FL hip link DH Placement in CAD: position at hip axis center,
+    rotation aligns local Z with CAD X (hip rotation axis)."""
+    plc = ddf.link_placement_in_cad("FL_hip_link")
+    np.testing.assert_allclose(plc.position_cad_mm,
+                               [25.200, 12.500, 0.000], atol=0.5)
+    # Local Z in CAD frame should be (1,0,0) — hip axis direction.
+    z_axis = ddf.quat_to_rotmat(plc.quat_cad) @ np.array([0, 0, 1.0])
+    np.testing.assert_allclose(z_axis, [1.0, 0.0, 0.0], atol=1e-9)
