@@ -129,3 +129,27 @@ def test_constant_inter_link_rotations_present():
         assert R.shape == (3, 3)
         np.testing.assert_allclose(R.T @ R, np.eye(3), atol=1e-9)
         assert np.linalg.det(R) > 0
+
+
+def test_writes_three_yamls(tmp_path):
+    out_dir = tmp_path / "config"
+    djf.write_outputs(out_dir)
+    import yaml
+    jf = yaml.safe_load((out_dir / "joint_frames.yaml").read_text())
+    lp = yaml.safe_load((out_dir / "link_params.yaml").read_text())
+    uj = yaml.safe_load((out_dir / "urdf_joints.yaml").read_text())
+    # joint_frames: 17 link entries each with position_cad_mm + quat_xyzw
+    assert len(jf["links"]) == 17
+    sample = jf["links"]["FL_hip_link"]
+    assert "position_cad_mm" in sample and len(sample["position_cad_mm"]) == 3
+    assert "quat_xyzw" in sample and len(sample["quat_xyzw"]) == 4
+    # link_params: 3 scalar lengths + 3 rpy triples
+    for k in ("L_hh", "L_th", "L_sh"):
+        assert isinstance(lp[k], float)
+    for k in ("hip_to_thigh_rpy", "thigh_to_knee_rpy", "knee_to_foot_rpy"):
+        assert len(lp[k]) == 3
+    # urdf_joints: 4 legs each with base_to_hip_xyz + rpy (3-floats each)
+    assert set(uj["per_leg"]) == {"FL", "FR", "BL", "BR"}
+    for leg in uj["per_leg"]:
+        assert len(uj["per_leg"][leg]["base_to_hip_xyz"]) == 3
+        assert len(uj["per_leg"][leg]["base_to_hip_rpy"]) == 3
