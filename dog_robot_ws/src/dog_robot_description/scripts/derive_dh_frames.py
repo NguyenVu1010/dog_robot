@@ -58,6 +58,15 @@ def cad_to_urdf_point(p_mm: Tuple[float, float, float],
     ])
 
 
+def cad_to_urdf_dir(v_cad: Tuple[float, float, float]) -> np.ndarray:
+    """Map a CAD direction vector to URDF (no translation).
+
+    Same rotational mapping as cad_to_urdf_point, dimensionless.
+    """
+    v = np.asarray(v_cad, dtype=float)
+    return np.array([-v[0], v[2], v[1]])
+
+
 def main() -> None:
     raise NotImplementedError("derive_dh_frames.main: implemented in later tasks")
 
