@@ -148,6 +148,16 @@ def test_writes_three_yamls(tmp_path):
         assert isinstance(lp[k], float)
     for k in ("hip_to_thigh_rpy", "thigh_to_knee_rpy", "knee_to_foot_rpy"):
         assert len(lp[k]) == 3
+    # Quaternion norm should be ~1.0 for every link
+    import math
+    for name, info in jf["links"].items():
+        q = info["quat_xyzw"]
+        n = math.sqrt(sum(c * c for c in q))
+        assert abs(n - 1.0) < 1e-6, f"{name} quat not unit: {q} (|q|={n})"
+    # Lengths in meters: catch a missing mm→m scaling regression
+    assert 0.01 < lp["L_hh"] < 0.10
+    assert 0.05 < lp["L_th"] < 0.20
+    assert 0.03 < lp["L_sh"] < 0.15
     # urdf_joints: 4 legs each with base_to_hip_xyz + rpy (3-floats each)
     assert set(uj["per_leg"]) == {"FL", "FR", "BL", "BR"}
     for leg in uj["per_leg"]:
