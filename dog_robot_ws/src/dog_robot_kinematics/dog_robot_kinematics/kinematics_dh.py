@@ -7,6 +7,7 @@ DH table (one symmetric set for all 4 legs; d_* default to 0):
     3 |     0       |  L_th   |  d_knee   |  theta_knee
     F |     0       |  L_sh   |  d_foot   |  0
 """
+import math
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -49,32 +50,63 @@ def fk_leg(dh: DHParams, theta: Tuple[float, float, float]) -> np.ndarray:
 
 
 def ik_leg(dh: DHParams, foot_h: np.ndarray, knee_direction: int = +1) -> Tuple[float, float, float]:
-    """Closed-form inverse kinematics for one 3-DOF leg.
+    """Closed-form inverse kinematics for one 3-DOF leg with d offsets.
 
     foot_h: foot target in hip frame H, shape (3,).
     knee_direction: +1 or -1 — chooses elbow-up vs elbow-down branch.
     Returns (theta_hip, theta_thigh, theta_knee). Raises ValueError if unreachable.
+
+    Approach with d_thigh (offset along Y_1 = thigh axis):
+      - Project foot into the hip-yaw plane. The lateral component of the
+        foot relative to the hip axis must equal d_thigh after the hip yaw
+        rotation (so the thigh root sits at the right Y in hip frame).
+      - solve theta_hip such that the in-plane Y of the foot matches d_thigh
+        plus the in-plane Y contribution of d_knee.
+      - Then solve 2R planar (thigh+knee) in the leg plane.
     """
     x, y, z = float(foot_h[0]), float(foot_h[1]), float(foot_h[2])
 
-    if abs(x) < 1e-12 and abs(y) < 1e-12:
-        raise ValueError("foot on hip yaw axis: theta_hip undefined")
-    theta_hip = np.arctan2(y, x)
+    # Total lateral offset that hip yaw cannot affect along Z_thigh (Y in hip
+    # frame after the alpha=-pi/2 rotation maps Y -> Z). The two contributions
+    # are d_thigh (constant) and d_knee (constant since alpha_2 = 0).
+    d_lat = dh.d_thigh + dh.d_knee + dh.d_foot
 
-    r = np.hypot(x, y)
-    a_t = r - dh.L_hh
-    b_t = -z  # alpha=-pi/2 in A2 negates z in the hip frame vs. the planar leg plane
+    # foot expressed in the "leg plane frame" after hip yaw:
+    #   Let r = sqrt(x^2 + y^2). After rotating by -theta_hip around Z, the
+    #   foot has X' = r*cos(?), Y' = r*sin(?). For the leg to reach foot, the
+    #   Y' component (perpendicular to leg plane) must equal d_lat.
+    r = math.hypot(x, y)
+    if r < 1e-9:
+        raise ValueError("foot on hip yaw axis: theta_hip undefined")
+    if abs(d_lat) > r + 1e-9:
+        raise ValueError(f"foot lateral component {r:.4f} m smaller than "
+                          f"|d_lat|={abs(d_lat):.4f} m: unreachable")
+    # phi = angle between (x,y) and the leg plane's X axis.
+    # theta_hip = atan2(y, x) - phi, where sin(phi) = d_lat / r.
+    sin_phi = d_lat / r
+    sin_phi = max(-1.0, min(1.0, sin_phi))
+    phi = math.asin(sin_phi)
+    theta_hip = math.atan2(y, x) - phi
+
+    # foot in leg-plane frame (post hip yaw):
+    x_lp = math.cos(theta_hip) * x + math.sin(theta_hip) * y
+    # y_lp == d_lat by construction.
+    # z stays the same (hip yaw is about Z).
+
+    # Now planar 2R for thigh+knee in (x_lp - L_hh, -z) coordinates:
+    a_t = x_lp - dh.L_hh
+    b_t = -z
 
     dist_sq = a_t * a_t + b_t * b_t
     cos_knee = (dist_sq - dh.L_th**2 - dh.L_sh**2) / (2.0 * dh.L_th * dh.L_sh)
     if cos_knee > 1.0 + 1e-9 or cos_knee < -1.0 - 1e-9:
-        raise ValueError(f"foot out of reach: dist={np.sqrt(dist_sq):.4f} m, "
-                         f"max={dh.L_th + dh.L_sh:.4f} m")
-    cos_knee = float(np.clip(cos_knee, -1.0, 1.0))
-    theta_knee = knee_direction * np.arccos(cos_knee)
+        raise ValueError(f"foot out of reach: planar dist={math.sqrt(dist_sq):.4f} m, "
+                          f"max={dh.L_th + dh.L_sh:.4f} m")
+    cos_knee = max(-1.0, min(1.0, cos_knee))
+    theta_knee = knee_direction * math.acos(cos_knee)
     theta_thigh = (
-        np.arctan2(b_t, a_t)
-        - np.arctan2(dh.L_sh * np.sin(theta_knee),
-                     dh.L_th + dh.L_sh * np.cos(theta_knee))
+        math.atan2(b_t, a_t)
+        - math.atan2(dh.L_sh * math.sin(theta_knee),
+                     dh.L_th + dh.L_sh * math.cos(theta_knee))
     )
     return (float(theta_hip), float(theta_thigh), float(theta_knee))

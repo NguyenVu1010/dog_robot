@@ -104,3 +104,33 @@ def test_fk_leg_with_d_offsets_differs_from_zero_offsets():
     fk0 = fk_leg(dh0, theta)
     fk1 = fk_leg(dh1, theta)
     assert np.linalg.norm(fk0 - fk1) > 0.01  # > 1 cm
+
+
+# --- Task 8 d-offset IK roundtrip test ---
+
+def test_fk_ik_roundtrip_with_d_offsets():
+    """200-iter FK/IK roundtrip with realistic d offsets across all 4 legs."""
+    import numpy as np
+    from dog_robot_kinematics.kinematics_dh import DHParams, fk_leg, ik_leg
+    rng = np.random.default_rng(42)
+    dh = DHParams(L_hh=0.02520, L_th=0.10980, L_sh=0.07043,
+                  d_thigh=0.02536, d_knee=0.04102)
+    fails = 0
+    max_err = 0.0
+    for _ in range(200):
+        theta_in = (
+            rng.uniform(-0.6, 0.6),   # hip
+            rng.uniform(-1.0, 0.7),   # thigh
+            rng.uniform(0.2, 2.2),    # knee
+        )
+        foot = fk_leg(dh, theta_in)
+        try:
+            theta_out = ik_leg(dh, foot, knee_direction=+1)
+        except ValueError:
+            fails += 1
+            continue
+        foot_back = fk_leg(dh, theta_out)
+        err = float(np.linalg.norm(foot - foot_back))
+        max_err = max(max_err, err)
+    assert fails < 10, f"too many IK failures: {fails}/200"
+    assert max_err < 1e-4, f"max roundtrip error {max_err:.6f} m > 0.1 mm"
