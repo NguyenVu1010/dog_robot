@@ -61,6 +61,34 @@ def cad_to_urdf_direction(v_cad) -> np.ndarray:
     return np.array([-v[0], v[2], v[1]])
 
 
+# CAD axis directions for each joint (unit vectors).
+# Source: scripts/compute_joints.py inspection of circular edges.
+CAD_AXIS = {
+    "hip":   np.array([1.0, 0.0, 0.0]),  # CAD X -> URDF -X, will flip below
+    "thigh": np.array([0.0, 0.0, 1.0]),  # CAD Z -> URDF +Y
+    "knee":  np.array([0.0, 0.0, 1.0]),  # CAD Z -> URDF +Y
+}
+
+
+def joint_axes_urdf() -> Dict[str, Dict[str, np.ndarray]]:
+    """Per-leg unit joint axes in URDF frame, sign-normalised to +1 on dominant axis."""
+    out: Dict[str, Dict[str, np.ndarray]] = {}
+    for leg in ("FL", "FR", "BL", "BR"):
+        leg_axes: Dict[str, np.ndarray] = {}
+        for jname, vc in CAD_AXIS.items():
+            v = cad_to_urdf_direction(vc)
+            v = v / np.linalg.norm(v)
+            # Sign-normalise so the dominant component is positive.
+            dom = int(np.argmax(np.abs(v)))
+            if v[dom] < 0:
+                v = -v
+            leg_axes[jname] = v
+        # hip yaw is the world Z axis after orientation.
+        leg_axes["hip"] = np.array([0.0, 0.0, 1.0])
+        out[leg] = leg_axes
+    return out
+
+
 def joint_centers_urdf() -> Dict[str, Dict[str, np.ndarray]]:
     """Per-leg dict of joint center positions in URDF frame (m)."""
     out: Dict[str, Dict[str, np.ndarray]] = {}

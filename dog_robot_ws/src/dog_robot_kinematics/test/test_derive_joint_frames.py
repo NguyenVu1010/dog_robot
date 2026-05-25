@@ -36,3 +36,15 @@ def test_cad_to_urdf_axes_xyz_swap():
     np.testing.assert_allclose(out, np.array([0.0, 0.0, 1.0]), atol=1e-12)
     out = djf.cad_to_urdf_direction(np.array([0.0, 0.0, 1.0]))
     np.testing.assert_allclose(out, np.array([0.0, 1.0, 0.0]), atol=1e-12)
+
+
+def test_joint_axes_normalized_and_oriented():
+    axes = djf.joint_axes_urdf()  # dict[leg][joint] -> unit np.ndarray(3,)
+    for leg in ("FL", "FR", "BL", "BR"):
+        for j, a in axes[leg].items():
+            np.testing.assert_allclose(np.linalg.norm(a), 1.0, atol=1e-9)
+        # Hip yaw axis: URDF Z is the yaw axis.
+        np.testing.assert_allclose(axes[leg]["hip"], np.array([0., 0., 1.]), atol=1e-9)
+        # Thigh + knee pitch axes: URDF Y after CAD→URDF map; sign normalised positive.
+        np.testing.assert_allclose(axes[leg]["thigh"], np.array([0., 1., 0.]), atol=1e-9)
+        np.testing.assert_allclose(axes[leg]["knee"],  np.array([0., 1., 0.]), atol=1e-9)
