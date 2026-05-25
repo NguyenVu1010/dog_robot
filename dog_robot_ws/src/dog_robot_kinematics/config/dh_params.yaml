@@ -1,9 +1,12 @@
 stand_controller:
   ros__parameters:
     dh:
-      L_hh: 0.02553
-      L_th: 0.11725
-      L_sh: 0.07043
+      L_hh: 0.012836
+      L_th: 0.109541
+      L_sh: 0.070430
+      d_thigh: 0.025531
+      d_knee: 0.041810
+      d_foot: 0.000000
     stand:
       default_height: 0.15
       ramp_time: 2.0

@@ -5,6 +5,8 @@ import os
 import subprocess
 import math
 import xml.etree.ElementTree as ET
+import yaml
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -12,7 +14,23 @@ import pytest
 from dog_robot_kinematics.kinematics_dh import DHParams, fk_leg
 from dog_robot_kinematics.leg_config import LEGS
 
-DH = DHParams(L_hh=0.02553, L_th=0.11725, L_sh=0.07043)
+
+def _load_dh_from_yaml() -> DHParams:
+    cfg = Path(__file__).resolve().parents[1] / "config" / "dh_params.yaml"
+    with open(cfg) as f:
+        d = yaml.safe_load(f)
+    dh_block = d["stand_controller"]["ros__parameters"]["dh"]
+    return DHParams(
+        L_hh=dh_block["L_hh"],
+        L_th=dh_block["L_th"],
+        L_sh=dh_block["L_sh"],
+        d_thigh=dh_block.get("d_thigh", 0.0),
+        d_knee=dh_block.get("d_knee", 0.0),
+        d_foot=dh_block.get("d_foot", 0.0),
+    )
+
+
+DH = _load_dh_from_yaml()
 TOL = 1e-4   # meters
 
 
