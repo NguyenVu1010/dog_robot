@@ -48,3 +48,40 @@ def test_joint_axes_normalized_and_oriented():
         # Thigh + knee pitch axes: URDF Y after CAD→URDF map; sign normalised positive.
         np.testing.assert_allclose(axes[leg]["thigh"], np.array([0., 1., 0.]), atol=1e-9)
         np.testing.assert_allclose(axes[leg]["knee"],  np.array([0., 1., 0.]), atol=1e-9)
+
+
+def _is_orthonormal_rh(R: np.ndarray, atol: float = 1e-9) -> bool:
+    return (np.allclose(R.T @ R, np.eye(3), atol=atol)
+            and np.linalg.det(R) > 0)
+
+
+def test_link_frames_orthonormal_right_handed_for_all_legs():
+    frames = djf.link_frames_urdf()
+    # Expect: base_link + 4 legs * 4 links = 17 entries
+    assert len(frames) == 17
+    for name, info in frames.items():
+        assert _is_orthonormal_rh(info["R"]), f"{name}: R not orthonormal RH"
+        assert info["O"].shape == (3,)
+
+
+def test_hip_link_frame_basic_geometry_fl():
+    frames = djf.link_frames_urdf()
+    info = frames["FL_hip_link"]
+    expected_O = djf.joint_centers_urdf()["FL"]["hip"]
+    np.testing.assert_allclose(info["O"], expected_O, atol=1e-12)
+    # Z axis is hip yaw axis (URDF Z)
+    np.testing.assert_allclose(info["R"][:, 2], np.array([0., 0., 1.]), atol=1e-9)
+    # X axis lies in the XY plane (Z component ~ 0 after orthogonalisation)
+    assert abs(info["R"][2, 0]) < 1e-9
+
+
+def test_base_and_foot_use_world_aligned_frame():
+    frames = djf.link_frames_urdf()
+    np.testing.assert_allclose(frames["base_link"]["O"], np.zeros(3), atol=1e-12)
+    np.testing.assert_allclose(frames["base_link"]["R"], np.eye(3), atol=1e-12)
+    for leg in ("FL", "FR", "BL", "BR"):
+        np.testing.assert_allclose(
+            frames[f"{leg}_foot_link"]["R"], np.eye(3), atol=1e-9)
+        np.testing.assert_allclose(
+            frames[f"{leg}_foot_link"]["O"],
+            djf.joint_centers_urdf()[leg]["foot"], atol=1e-12)

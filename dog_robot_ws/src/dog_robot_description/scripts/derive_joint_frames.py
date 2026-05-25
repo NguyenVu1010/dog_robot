@@ -90,6 +90,45 @@ def joint_axes_urdf() -> Dict[str, Dict[str, np.ndarray]]:
     return out
 
 
+def _orthogonalise(target_dir: np.ndarray, z: np.ndarray,
+                    name: str) -> np.ndarray:
+    perp = target_dir - np.dot(target_dir, z) * z
+    n = np.linalg.norm(perp)
+    if n < 1e-6:
+        raise ValueError(f"{name}: target direction parallel to Z; degenerate")
+    return perp / n
+
+
+def _frame_from_zaxis_and_target(O: np.ndarray, z_axis: np.ndarray,
+                                  target: np.ndarray, name: str) -> Dict[str, np.ndarray]:
+    z = z_axis / np.linalg.norm(z_axis)
+    x = _orthogonalise(target - O, z, name)
+    y = np.cross(z, x)
+    R = np.column_stack([x, y, z])
+    return {"O": O.copy(), "R": R}
+
+
+def link_frames_urdf() -> Dict[str, Dict[str, np.ndarray]]:
+    """Per-link frame {O, R} in URDF root.  17 entries: base + 4 legs * 4 links."""
+    centers = joint_centers_urdf()
+    axes = joint_axes_urdf()
+    frames: Dict[str, Dict[str, np.ndarray]] = {
+        "base_link": {"O": np.zeros(3), "R": np.eye(3)},
+    }
+    for leg in ("FL", "FR", "BL", "BR"):
+        c = centers[leg]
+        a = axes[leg]
+        frames[f"{leg}_hip_link"] = _frame_from_zaxis_and_target(
+            c["hip"], a["hip"], c["thigh"], f"{leg}_hip_link")
+        frames[f"{leg}_thigh_link"] = _frame_from_zaxis_and_target(
+            c["thigh"], a["thigh"], c["knee"], f"{leg}_thigh_link")
+        frames[f"{leg}_shank_link"] = _frame_from_zaxis_and_target(
+            c["knee"], a["knee"], c["foot"], f"{leg}_shank_link")
+        # Foot: world-aligned at foot center.
+        frames[f"{leg}_foot_link"] = {"O": c["foot"].copy(), "R": np.eye(3)}
+    return frames
+
+
 def joint_centers_urdf() -> Dict[str, Dict[str, np.ndarray]]:
     """Per-leg dict of joint center positions in URDF frame (m)."""
     out: Dict[str, Dict[str, np.ndarray]] = {}
