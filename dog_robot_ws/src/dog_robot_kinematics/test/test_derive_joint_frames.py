@@ -106,3 +106,26 @@ def test_orthogonalise_raises_on_parallel_vectors():
     target_parallel = np.array([0.0, 0.0, 5.0])  # exact multiple of z
     with pytest.raises(ValueError, match="degenerate"):
         djf._orthogonalise(target_parallel, z, "test_case")
+
+
+def test_link_lengths_symmetric_across_legs():
+    lp = djf.link_params()
+    # 4 legs share L_hh, L_th, L_sh within 1 mm
+    # L_hh ~38 mm (3D distance hip→thigh including lateral offset)
+    assert lp["L_hh"] == pytest.approx(0.038, abs=5e-3)
+    assert lp["L_th"] == pytest.approx(0.117, abs=5e-3)
+    assert lp["L_sh"] == pytest.approx(0.070, abs=5e-3)
+    # Per-leg breakdown also present + matches mean within 1mm
+    for leg in ("FL", "FR", "BL", "BR"):
+        for k in ("L_hh", "L_th", "L_sh"):
+            assert abs(lp["per_leg"][leg][k] - lp[k]) < 1e-3
+
+
+def test_constant_inter_link_rotations_present():
+    lp = djf.link_params()
+    # Rotation matrices stored as 3x3 numpy arrays
+    for k in ("R_const_ht", "R_const_tk", "R_const_kf"):
+        R = lp[k]
+        assert R.shape == (3, 3)
+        np.testing.assert_allclose(R.T @ R, np.eye(3), atol=1e-9)
+        assert np.linalg.det(R) > 0

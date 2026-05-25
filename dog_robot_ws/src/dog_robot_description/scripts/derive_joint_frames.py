@@ -140,3 +140,57 @@ def link_frames_urdf() -> Dict[str, Dict[str, np.ndarray]]:
         # Foot: world-aligned at foot center.
         frames[f"{leg}_foot_link"] = {"O": c["foot"].copy(), "R": np.eye(3)}
     return frames
+
+
+def _length(a: np.ndarray, b: np.ndarray) -> float:
+    return float(np.linalg.norm(b - a))
+
+
+def link_params() -> Dict[str, object]:
+    """Compute mean link lengths and constant inter-link rotations across 4 legs.
+
+    Returns a dict with:
+      L_hh, L_th, L_sh  – mean link lengths (m) across the 4 legs
+      per_leg            – per-leg breakdown dict[leg][L_*]
+      R_const_ht         – mean rotation hip_link -> thigh_link (3x3 SO(3))
+      R_const_tk         – mean rotation thigh_link -> shank_link (3x3 SO(3))
+      R_const_kf         – mean rotation shank_link -> foot_link (3x3 SO(3))
+    """
+    centers = joint_centers_urdf()
+    frames = link_frames_urdf()
+    per_leg: Dict[str, Dict[str, float]] = {}
+    R_hts, R_tks, R_kfs = [], [], []
+    for leg in ("FL", "FR", "BL", "BR"):
+        c = centers[leg]
+        per_leg[leg] = {
+            "L_hh": _length(c["hip"],   c["thigh"]),
+            "L_th": _length(c["thigh"], c["knee"]),
+            "L_sh": _length(c["knee"],  c["foot"]),
+        }
+        Rh = frames[f"{leg}_hip_link"]["R"]
+        Rt = frames[f"{leg}_thigh_link"]["R"]
+        Rs = frames[f"{leg}_shank_link"]["R"]
+        Rf = frames[f"{leg}_foot_link"]["R"]
+        R_hts.append(Rh.T @ Rt)
+        R_tks.append(Rt.T @ Rs)
+        R_kfs.append(Rs.T @ Rf)
+
+    def mean(key: str) -> float:
+        return float(np.mean([per_leg[L][key] for L in per_leg]))
+
+    out: Dict[str, object] = {
+        "L_hh": mean("L_hh"), "L_th": mean("L_th"), "L_sh": mean("L_sh"),
+        "per_leg": per_leg,
+        "R_const_ht": np.mean(R_hts, axis=0),
+        "R_const_tk": np.mean(R_tks, axis=0),
+        "R_const_kf": np.mean(R_kfs, axis=0),
+    }
+    # Mean of rotation matrices isn't a rotation; re-orthonormalise via SVD.
+    for k in ("R_const_ht", "R_const_tk", "R_const_kf"):
+        U, _, Vt = np.linalg.svd(out[k])
+        R = U @ Vt
+        if np.linalg.det(R) < 0:
+            U[:, -1] *= -1
+            R = U @ Vt
+        out[k] = R
+    return out
