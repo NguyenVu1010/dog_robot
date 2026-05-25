@@ -32,32 +32,45 @@
        Visual meshes are pre-baked in meshes/visual_dh/ (see
        scripts/bake_meshes_to_link_frame.py); URDF visual <origin> is
        identity for every link. -->
-  <xacro:property name="L_hh" value="0.02553"/>
-  <xacro:property name="L_th" value="0.11725"/>
-  <xacro:property name="L_sh" value="0.07043"/>
+  <!-- Generated DH params (mean across 4 legs) — see scripts/derive_dh_frames.py -->
+  <xacro:property name="L_hh"        value="0.012836"/>
+  <xacro:property name="L_th"        value="0.109541"/>
+  <xacro:property name="L_sh"        value="0.070430"/>
+  <xacro:property name="d_thigh"     value="0.025531"/>
+  <xacro:property name="d_knee"      value="0.041810"/>
+  <xacro:property name="d_foot"      value="0.000000"/>
+  <xacro:property name="alpha_thigh" value="-1.5707963"/>
 
   <xacro:leg prefix="FL"
              base_to_hip_xyz="0.07480 0.04000 0.03510"
              base_to_hip_rpy="0 1.5707963 0"
              L_hh="${L_hh}" L_th="${L_th}" L_sh="${L_sh}"
+             d_thigh="${d_thigh}" d_knee="${d_knee}" d_foot="${d_foot}"
+             alpha_thigh="${alpha_thigh}"
              foot_sphere_xyz="0 0 0"/>
 
   <xacro:leg prefix="FR"
              base_to_hip_xyz="0.07480 -0.04000 0.03510"
              base_to_hip_rpy="0 1.5707963 3.1415927"
              L_hh="${L_hh}" L_th="${L_th}" L_sh="${L_sh}"
+             d_thigh="${d_thigh}" d_knee="${d_knee}" d_foot="${d_foot}"
+             alpha_thigh="${alpha_thigh}"
              foot_sphere_xyz="0 0 0"/>
 
   <xacro:leg prefix="BL"
              base_to_hip_xyz="-0.07480 0.04000 0.03510"
              base_to_hip_rpy="0 1.5707963 0"
              L_hh="${L_hh}" L_th="${L_th}" L_sh="${L_sh}"
+             d_thigh="${d_thigh}" d_knee="${d_knee}" d_foot="${d_foot}"
+             alpha_thigh="${alpha_thigh}"
              foot_sphere_xyz="0 0 0"/>
 
   <xacro:leg prefix="BR"
              base_to_hip_xyz="-0.07480 -0.04000 0.03510"
              base_to_hip_rpy="0 1.5707963 3.1415927"
              L_hh="${L_hh}" L_th="${L_th}" L_sh="${L_sh}"
+             d_thigh="${d_thigh}" d_knee="${d_knee}" d_foot="${d_foot}"
+             alpha_thigh="${alpha_thigh}"
              foot_sphere_xyz="0 0 0"/>
 
 </robot>
