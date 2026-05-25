@@ -88,8 +88,15 @@ def ik_leg(p: LinkParams, foot_in_hip: np.ndarray,
     problem and q_yaw are recovered analytically.
 
     foot_in_hip: (3,) numpy array in hip-yaw frame, meters.
-    knee_branch: +1 or -1 — selects the quadratic root (two leg configurations).
+    knee_branch: +1 or -1 — selects the quadratic root in vx (two distinct leg
+        configurations, not the classical elbow-up/down sign). +1 recovers the
+        natural FK config for a forward-thigh / bent-knee standing pose and is
+        the branch controllers should use.
     Raises ValueError on unreachable target or yaw-undefined geometry.
+
+    Note: R_const_ht is a general 3D rotation for this robot (not the pure Rx the
+    original design assumed), so q_yaw cannot be read off directly; it is solved
+    from the two Rz(q_yaw)-invariants below.
     """
     x, y, z = float(foot_in_hip[0]), float(foot_in_hip[1]), float(foot_in_hip[2])
 

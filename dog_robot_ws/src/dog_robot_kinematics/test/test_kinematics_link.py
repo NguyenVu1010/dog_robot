@@ -70,6 +70,34 @@ def test_ik_roundtrip_random_targets():
     assert n_pass > 180  # allow a few unreachable samples
 
 
+def test_ik_default_branch_roundtrip():
+    # The default knee_branch=+1 path is what controllers use; the random
+    # roundtrip above only ever exercises -1 (its q_knee is always negative).
+    rng = np.random.default_rng(7)
+    p = _P()
+    n_pass = 0
+    for _ in range(200):
+        theta_in = (
+            float(rng.uniform(-0.4, 0.4)),
+            float(rng.uniform(0.3, 1.3)),
+            float(rng.uniform(-1.4, -0.3)),
+        )
+        foot = fk_leg(p, theta_in)
+        foot2 = fk_leg(p, ik_leg(p, foot, knee_branch=+1))
+        np.testing.assert_allclose(foot, foot2, atol=1e-6)
+        n_pass += 1
+    assert n_pass == 200
+
+
+def test_ik_default_branch_recovers_natural_config():
+    # For a natural standing config (thigh forward, knee bent back), branch +1
+    # recovers the exact joint angles, not just a foot-equivalent solution.
+    p = _P()
+    theta_in = (0.1, 0.3, -0.8)
+    theta_out = ik_leg(p, fk_leg(p, theta_in), knee_branch=+1)
+    np.testing.assert_allclose(theta_out, theta_in, atol=1e-6)
+
+
 def test_ik_unreachable_raises():
     p = _P()
     far = np.array([1.0, 0.0, 0.0])  # way outside workspace
