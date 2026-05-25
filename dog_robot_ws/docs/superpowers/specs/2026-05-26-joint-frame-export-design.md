@@ -198,22 +198,37 @@ def ik_leg(p: LinkParams, foot_in_hip: np.ndarray,
 - `foot_in_hip = (T_yaw · T_h→t · T_thigh · T_t→k · T_knee · T_k→f
                   · [0,0,0,1]ᵀ).xyz`
 
-**IK closed form:**
-1. Project `foot_in_hip` onto the plane perpendicular to `Z_hip`;
-   `q_yaw = atan2(y, x)`. (Valid because `R_const_ht` is pure Rx/Ry
-   for this robot — see §8 risk.)
-2. Rotate foot into the hip plane: `foot' = Rz(−q_yaw) · foot`.
-3. Subtract `L_hh` along X, transform by `R_const_htᵀ` to enter thigh
-   root frame; result is `(u, v)` in the 2R plane.
-4. 2R planar:
-   - `c = (u² + v² − L_th² − L_sh²) / (2 L_th L_sh)`
-   - `q_knee  = knee_branch · acos(c)`
-   - `q_thigh = atan2(v, u) − atan2(L_sh sin q_knee,
-                                    L_th + L_sh cos q_knee)`
+**IK closed form** (implemented; differs from the first-draft assumption):
+
+The derived `R_const_ht` for this robot is a **general 3D rotation**, not the
+pure Rx the first draft assumed, so `q_yaw` cannot be read off as `atan2(y, x)`.
+The solver instead uses the two quantities that are invariant under `Rz(q_yaw)`
+— the foot's Z component and its XY radius:
+
+1. Let `v = (vx, vy, 0)` be the foot in the thigh-root frame (`vz = 0` holds
+   because `R_const_tk` is a pure Rz, verified at derivation time).
+2. `z = c0[2]·vx + c1[2]·vy` and
+   `r_xy² = (L_hh + c0[0]·vx + c1[0]·vy)² + (c0[1]·vx + c1[1]·vy)²`,
+   where `c0, c1` are the first two columns of `R_const_ht`. Eliminating `vy`
+   gives a quadratic in `vx`; `knee_branch ∈ {+1, −1}` picks the root.
+3. 2R planar in the thigh frame yields `(q_thigh, q_knee)`, with the knee
+   offset by the constant `alpha_tk` baked into `R_const_tk`.
+4. `q_yaw` is recovered from the angle of the reconstructed zero-yaw foot
+   vector versus the measured foot angle.
+
+`knee_branch=+1` recovers the natural FK config for a forward-thigh / bent-knee
+standing pose and is the branch controllers use.
 
 `R_const_kf` does not enter the IK position calculation — foot origin in
 shank frame is `(L_sh, 0, 0)` regardless of foot orientation. `R_const_kf`
 only matters when an upstream consumer needs foot **orientation**.
+
+**Caveat — cross-leg averaging.** `L_hh/L_th/L_sh` and the three `R_const_*`
+are means over the four legs (SVD-reorthonormalised). `fk_leg(0,0,0)` therefore
+reproduces a single leg's measured foot to ~6 mm rather than exactly. This is
+acceptable for a symmetric robot; per-leg exact params would remove it if a
+future need arises. The visual STLs are still per-leg exact (each uses its own
+placement in `joint_frames.yaml`).
 
 **Errors:**
 - `|c| > 1` → `ValueError("foot unreachable")`
@@ -339,13 +354,13 @@ Each step is a separate commit, independently revertable.
 **Medium-low.** The convention is simpler than MDH — no common-normal
 arithmetic — so derivation is straightforward.
 
-Primary risk: the IK closed-form assumes `R_const_ht` is a pure Rx or Ry
-rotation, so `q_yaw = atan2(y, x)` is exact. Current CAD measurements
-indicate hip axis = URDF Z, thigh axis = URDF Y, knee axis = URDF Y →
-`R_const_ht ≈ Rx(-π/2)` and the assumption holds. If `derive_joint_frames.py`
-finds `R_const_ht` deviates (off-diagonal terms > 1e-3), fall back to
-numerical IK via `scipy.optimize.fsolve` seeded with the closed-form
-solution. Listed as a follow-up — not in initial scope.
+Primary risk (RESOLVED during Task 8): the first-draft IK assumed `R_const_ht`
+was a pure Rx so `q_yaw = atan2(y, x)`. The derived matrix turned out to be a
+general 3D rotation, so that shortcut is invalid. Rather than fall back to
+numerical IK, the closed-form was generalised to solve `q_yaw` from the two
+`Rz(q_yaw)`-invariants (foot Z + XY radius) — see §5.3. This stays fully
+analytic and roundtrips 200/200 in tests. The only residual approximation is
+the cross-leg averaging (~6 mm; see §5.3 caveat).
 
 FreeCAD export side is low risk — script reused unchanged except for
 input path.
