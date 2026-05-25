@@ -198,6 +198,22 @@ def derive_leg(name: str) -> DerivedLeg:
     )
 
 
+def mean_mdh_params() -> Dict[str, float]:
+    """Average MDH params across the 4 legs. Use these as the symmetric
+    DH table for all legs in URDF + kinematics_dh."""
+    legs = [derive_leg(n) for n in ("FL", "FR", "BL", "BR")]
+    return {
+        "L_hh":   float(np.mean([l.L_hh for l in legs])),
+        "L_th":   float(np.mean([l.L_th for l in legs])),
+        "L_sh":   float(np.mean([l.L_sh for l in legs])),
+        "d_thigh": float(np.mean([abs(l.d_thigh) for l in legs])),
+        "d_knee":  float(np.mean([abs(l.d_knee)  for l in legs])),
+        "d_foot":  float(np.mean([abs(l.d_foot)  for l in legs])),
+        "alpha_1": float(np.mean([l.alpha_1_rad for l in legs])),
+        "alpha_2": float(np.mean([l.alpha_2_rad for l in legs])),
+    }
+
+
 def main() -> None:
     raise NotImplementedError("derive_dh_frames.main: implemented in later tasks")
 
