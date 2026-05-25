@@ -12,8 +12,6 @@ Outputs (when run as a script):
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
-from pathlib import Path
 from typing import Dict, Tuple
 
 import numpy as np
