@@ -34,17 +34,20 @@ MEASURED_KNEE_MM: Dict[str, Tuple[float, float, float]] = {
     "BL": (283.410, -72.261,   66.183),
     "BR": (282.987, -70.980, -148.400),
 }
-# Foot center: midpoint of shank and foot cluster centroids in CAD mm,
-# copied directly from compute_joints.py output for stability.
+# Foot center: midpoint of shank-cluster and foot-cluster centroids in CAD mm.
+# Source: scripts/compute_joints.py output ("CAD_JOINT_POSITIONS" section,
+# *_foot_fixed entries). To regenerate, run
+#   python3 scripts/compute_joints.py 2>&1 | grep foot_fixed
 MEASURED_FOOT_MM: Dict[str, Tuple[float, float, float]] = {
-    "FL": (39.640, -98.589,   56.140),
-    "FR": (38.850, -98.700, -138.250),
-    "BL": (231.000, -99.245,  57.060),
-    "BR": (230.700, -99.200, -138.350),
+    "FL": (32.3,  -102.4,   47.2),
+    "FR": (31.6,  -102.7, -130.1),
+    "BL": (223.2, -102.6,   47.1),
+    "BR": (222.4, -102.7, -130.0),
 }
 
 
-def cad_to_urdf_point(p_mm, origin_mm: Tuple[float, float, float] = BODY_CENTER_MM
+def cad_to_urdf_point(p_mm: Tuple[float, float, float],
+                       origin_mm: Tuple[float, float, float] = BODY_CENTER_MM
                        ) -> np.ndarray:
     """Convert CAD point (mm) to URDF point (m)."""
     p = np.asarray(p_mm, dtype=float)
