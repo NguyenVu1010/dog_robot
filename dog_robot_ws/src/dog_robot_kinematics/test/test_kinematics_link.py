@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from dog_robot_kinematics.kinematics_link import LinkParams, load_link_params, fk_leg
+from dog_robot_kinematics.kinematics_link import LinkParams, load_link_params, fk_leg, ik_leg
 
 
 CFG = (Path(__file__).resolve().parents[2]
@@ -47,3 +47,31 @@ def test_fk_yaw_rotates_foot_in_xy_plane():
     assert np.linalg.norm(f0[:2]) == pytest.approx(np.linalg.norm(f1[:2]), abs=1e-9)
     # z unchanged
     assert f0[2] == pytest.approx(f1[2], abs=1e-9)
+
+
+def test_ik_roundtrip_random_targets():
+    rng = np.random.default_rng(42)
+    p = _P()
+    n_pass = 0
+    for _ in range(200):
+        theta_in = (
+            float(rng.uniform(-0.5, 0.5)),
+            float(rng.uniform(-1.0, 1.0)),
+            float(rng.uniform(-1.5, -0.2)),  # knee bent
+        )
+        foot = fk_leg(p, theta_in)
+        try:
+            theta_out = ik_leg(p, foot, knee_branch=+1 if theta_in[2] >= 0 else -1)
+        except ValueError:
+            continue
+        foot2 = fk_leg(p, theta_out)
+        np.testing.assert_allclose(foot, foot2, atol=1e-6)
+        n_pass += 1
+    assert n_pass > 180  # allow a few unreachable samples
+
+
+def test_ik_unreachable_raises():
+    p = _P()
+    far = np.array([1.0, 0.0, 0.0])  # way outside workspace
+    with pytest.raises(ValueError):
+        ik_leg(p, far)
