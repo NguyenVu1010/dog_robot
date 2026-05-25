@@ -85,3 +85,24 @@ def test_base_and_foot_use_world_aligned_frame():
         np.testing.assert_allclose(
             frames[f"{leg}_foot_link"]["O"],
             djf.joint_centers_urdf()[leg]["foot"], atol=1e-12)
+
+
+def test_thigh_and_shank_origins_match_joint_centers():
+    frames = djf.link_frames_urdf()
+    centers = djf.joint_centers_urdf()
+    for leg in ("FL", "FR", "BL", "BR"):
+        np.testing.assert_allclose(
+            frames[f"{leg}_thigh_link"]["O"],
+            centers[leg]["thigh"], atol=1e-12,
+            err_msg=f"{leg}_thigh_link origin mismatch")
+        np.testing.assert_allclose(
+            frames[f"{leg}_shank_link"]["O"],
+            centers[leg]["knee"], atol=1e-12,
+            err_msg=f"{leg}_shank_link origin mismatch")
+
+
+def test_orthogonalise_raises_on_parallel_vectors():
+    z = np.array([0.0, 0.0, 1.0])
+    target_parallel = np.array([0.0, 0.0, 5.0])  # exact multiple of z
+    with pytest.raises(ValueError, match="degenerate"):
+        djf._orthogonalise(target_parallel, z, "test_case")

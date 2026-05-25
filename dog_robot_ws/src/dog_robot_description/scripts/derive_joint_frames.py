@@ -90,6 +90,19 @@ def joint_axes_urdf() -> Dict[str, Dict[str, np.ndarray]]:
     return out
 
 
+def joint_centers_urdf() -> Dict[str, Dict[str, np.ndarray]]:
+    """Per-leg dict of joint center positions in URDF frame (m)."""
+    out: Dict[str, Dict[str, np.ndarray]] = {}
+    for leg in ("FL", "FR", "BL", "BR"):
+        out[leg] = {
+            "hip":   cad_to_urdf_point(MEASURED_HIP_MM[leg]),
+            "thigh": cad_to_urdf_point(MEASURED_THIGH_MM[leg]),
+            "knee":  cad_to_urdf_point(MEASURED_KNEE_MM[leg]),
+            "foot":  cad_to_urdf_point(MEASURED_FOOT_MM[leg]),
+        }
+    return out
+
+
 def _orthogonalise(target_dir: np.ndarray, z: np.ndarray,
                     name: str) -> np.ndarray:
     perp = target_dir - np.dot(target_dir, z) * z
@@ -127,16 +140,3 @@ def link_frames_urdf() -> Dict[str, Dict[str, np.ndarray]]:
         # Foot: world-aligned at foot center.
         frames[f"{leg}_foot_link"] = {"O": c["foot"].copy(), "R": np.eye(3)}
     return frames
-
-
-def joint_centers_urdf() -> Dict[str, Dict[str, np.ndarray]]:
-    """Per-leg dict of joint center positions in URDF frame (m)."""
-    out: Dict[str, Dict[str, np.ndarray]] = {}
-    for leg in ("FL", "FR", "BL", "BR"):
-        out[leg] = {
-            "hip":   cad_to_urdf_point(MEASURED_HIP_MM[leg]),
-            "thigh": cad_to_urdf_point(MEASURED_THIGH_MM[leg]),
-            "knee":  cad_to_urdf_point(MEASURED_KNEE_MM[leg]),
-            "foot":  cad_to_urdf_point(MEASURED_FOOT_MM[leg]),
-        }
-    return out
