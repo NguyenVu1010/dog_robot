@@ -361,7 +361,10 @@ def main() -> None:
     lines.append(f"    position_cad_mm: [{_format_float(BODY_CENTER_MM[0])}, "
                  f"{_format_float(BODY_CENTER_MM[1])}, "
                  f"{_format_float(BODY_CENTER_MM[2])}]")
-    lines.append("    quat_xyzw: [0.0, 0.0, 0.0, 1.0]")
+    lines.append(f"    quat_xyzw: [{_format_float(0.0)}, "
+                 f"{_format_float(0.0)}, "
+                 f"{_format_float(0.0)}, "
+                 f"{_format_float(1.0)}]")
     out.write_text("\n".join(lines) + "\n")
     print(f"\nwrote {out}")
 
