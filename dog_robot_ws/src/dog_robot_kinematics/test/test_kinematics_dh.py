@@ -77,3 +77,30 @@ def test_mirror_signs_match_side():
     assert get_leg("FR").mirror == -1
     assert get_leg("BL").mirror == +1
     assert get_leg("BR").mirror == -1
+
+
+# --- Task 7 d-offset tests ---
+
+def test_dhparams_accepts_d_offsets_with_default_zero():
+    """DHParams accepts d_thigh, d_knee, d_foot (default 0 keeps old behaviour)."""
+    from dog_robot_kinematics.kinematics_dh import DHParams
+    dh0 = DHParams(L_hh=0.025, L_th=0.117, L_sh=0.070)
+    assert dh0.d_thigh == 0.0
+    assert dh0.d_knee == 0.0
+    assert dh0.d_foot == 0.0
+    dh1 = DHParams(L_hh=0.025, L_th=0.117, L_sh=0.070,
+                   d_thigh=0.025, d_knee=0.041, d_foot=0.019)
+    assert dh1.d_thigh == 0.025
+
+
+def test_fk_leg_with_d_offsets_differs_from_zero_offsets():
+    """Non-zero d_thigh / d_knee changes FK output."""
+    import numpy as np
+    from dog_robot_kinematics.kinematics_dh import DHParams, fk_leg
+    dh0 = DHParams(L_hh=0.025, L_th=0.117, L_sh=0.070)
+    dh1 = DHParams(L_hh=0.025, L_th=0.117, L_sh=0.070,
+                   d_thigh=0.025, d_knee=0.041)
+    theta = (0.1, -0.3, 1.0)
+    fk0 = fk_leg(dh0, theta)
+    fk1 = fk_leg(dh1, theta)
+    assert np.linalg.norm(fk0 - fk1) > 0.01  # > 1 cm
