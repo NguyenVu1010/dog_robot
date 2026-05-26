@@ -131,6 +131,32 @@ def test_constant_inter_link_rotations_present():
         assert np.linalg.det(R) > 0
 
 
+def test_leg_joint_transforms_exact():
+    lt = djf.leg_joint_transforms()
+    fr = djf.link_frames_urdf()
+    assert set(lt) == {"FL", "FR", "BL", "BR"}
+    pc = {"hip_to_thigh": ("hip_link", "thigh_link"),
+          "thigh_to_knee": ("thigh_link", "shank_link"),
+          "knee_to_foot": ("shank_link", "foot_link")}
+    for leg in ("FL", "FR", "BL", "BR"):
+        for key, (par, ch) in pc.items():
+            xyz = np.asarray(lt[leg][key]["xyz"])
+            R = lt[leg][key]["R"]
+            assert abs(xyz[1]) < 1e-6           # Y ~ 0 by frame construction
+            np.testing.assert_allclose(R.T @ R, np.eye(3), atol=1e-9)
+            # exact: reproduces the child origin in the parent frame
+            Op, Rp = fr[f"{leg}_{par}"]["O"], fr[f"{leg}_{par}"]["R"]
+            Oc = fr[f"{leg}_{ch}"]["O"]
+            np.testing.assert_allclose(xyz, Rp.T @ (Oc - Op), atol=1e-12)
+    # Front and back legs differ at the hip (thigh points forward vs backward),
+    # so the hip->thigh ROTATION differs substantially between FL and BL — this
+    # is why per-leg (not per-side) transforms are required.
+    R_fl = lt["FL"]["hip_to_thigh"]["R"]
+    R_bl = lt["BL"]["hip_to_thigh"]["R"]
+    ang = np.degrees(np.arccos(np.clip((np.trace(R_fl.T @ R_bl) - 1) / 2, -1, 1)))
+    assert ang > 30.0
+
+
 def test_writes_three_yamls(tmp_path):
     out_dir = tmp_path / "config"
     djf.write_outputs(out_dir)
@@ -143,11 +169,14 @@ def test_writes_three_yamls(tmp_path):
     sample = jf["links"]["FL_hip_link"]
     assert "position_cad_mm" in sample and len(sample["position_cad_mm"]) == 3
     assert "quat_xyzw" in sample and len(sample["quat_xyzw"]) == 4
-    # link_params: 3 scalar lengths + 3 rpy triples
+    # link_params: 3 scalar lengths + per-leg joint transforms (xyz + rpy)
     for k in ("L_hh", "L_th", "L_sh"):
         assert isinstance(lp[k], float)
-    for k in ("hip_to_thigh_rpy", "thigh_to_knee_rpy", "knee_to_foot_rpy"):
-        assert len(lp[k]) == 3
+    for leg in ("FL", "FR", "BL", "BR"):
+        assert set(lp[leg]) == {"hip_to_thigh", "thigh_to_knee", "knee_to_foot"}
+        for key in lp[leg]:
+            assert len(lp[leg][key]["xyz"]) == 3
+            assert len(lp[leg][key]["rpy"]) == 3
     # Quaternion norm should be ~1.0 for every link
     import math
     for name, info in jf["links"].items():

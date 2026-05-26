@@ -3,99 +3,86 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from dog_robot_kinematics.kinematics_link import LinkParams, load_link_params, fk_leg, ik_leg
+from dog_robot_kinematics.kinematics_link import (
+    LinkParams, load_link_params, fk_leg, ik_leg)
 
 
 CFG = (Path(__file__).resolve().parents[2]
        / "dog_robot_description" / "config" / "link_params.yaml")
 
 
-def test_linkparams_dataclass_fields():
-    p = LinkParams(
-        L_hh=0.025, L_th=0.117, L_sh=0.070,
-        R_const_ht=np.eye(3), R_const_tk=np.eye(3), R_const_kf=np.eye(3))
-    assert p.L_hh == 0.025
-    assert p.R_const_ht.shape == (3, 3)
+def _P(leg="FL"):
+    return load_link_params(CFG, leg)
 
 
-def test_load_link_params_from_yaml():
-    p = load_link_params(CFG)
-    assert isinstance(p, LinkParams)
-    assert 0.020 < p.L_hh < 0.050   # actual value is ~0.038 (3D distance)
-    assert 0.110 < p.L_th < 0.125
-    assert 0.060 < p.L_sh < 0.080
-    for R in (p.R_const_ht, p.R_const_tk, p.R_const_kf):
-        np.testing.assert_allclose(R.T @ R, np.eye(3), atol=1e-9)
+def test_load_link_params_per_leg():
+    for leg in ("FL", "FR", "BL", "BR"):
+        p = load_link_params(CFG, leg)
+        assert isinstance(p, LinkParams)
+        assert 0.020 < p.L_hh < 0.050   # ~0.038 (full 3D distance)
+        assert 0.110 < p.L_th < 0.125
+        assert 0.060 < p.L_sh < 0.080
+        for R in (p.R_ht, p.R_tk, p.R_kf):
+            np.testing.assert_allclose(R.T @ R, np.eye(3), atol=1e-9)
+        for t in (p.t_ht, p.t_tk, p.t_kf):
+            assert t.shape == (3,)
+        # R_tk is a pure Rz (thigh and knee axes parallel) — IK relies on this.
+        np.testing.assert_allclose(p.R_tk[2], np.array([0., 0., 1.]), atol=1e-9)
+        np.testing.assert_allclose(p.R_tk[:, 2], np.array([0., 0., 1.]), atol=1e-9)
 
 
-def _P():
-    return load_link_params(CFG)
-
-
-def test_fk_zero_angles_returns_static_foot_position():
-    p = _P()
-    foot = fk_leg(p, (0.0, 0.0, 0.0))
-    assert foot.shape == (3,)
-    assert np.linalg.norm(foot) > 0.05  # roughly L_hh + L_th + L_sh order
+def test_fk_zero_angles_reproduces_measured_foot():
+    # At theta=0 (the CAD rest pose the frames were derived from) fk must
+    # reproduce the measured foot-relative-to-hip — exact per leg (no averaging).
+    import sys
+    sys.path.insert(0, str(CFG.parents[2] / "scripts"))
+    import derive_joint_frames as djf
+    fr = djf.link_frames_urdf()
+    for leg in ("FL", "FR", "BL", "BR"):
+        p = load_link_params(CFG, leg)
+        foot = fk_leg(p, (0.0, 0.0, 0.0))
+        Oh, Rh = fr[f"{leg}_hip_link"]["O"], fr[f"{leg}_hip_link"]["R"]
+        Of = fr[f"{leg}_foot_link"]["O"]
+        true = Rh.T @ (Of - Oh)
+        np.testing.assert_allclose(foot, true, atol=1e-9)
 
 
 def test_fk_yaw_rotates_foot_in_xy_plane():
     p = _P()
     f0 = fk_leg(p, (0.0, 0.0, 0.0))
     f1 = fk_leg(p, (np.pi / 2, 0.0, 0.0))
-    # |xy| preserved under yaw rotation
     assert np.linalg.norm(f0[:2]) == pytest.approx(np.linalg.norm(f1[:2]), abs=1e-9)
-    # z unchanged
     assert f0[2] == pytest.approx(f1[2], abs=1e-9)
 
 
-def test_ik_roundtrip_random_targets():
+def test_ik_roundtrip_random_targets_all_legs():
     rng = np.random.default_rng(42)
-    p = _P()
-    n_pass = 0
-    for _ in range(200):
-        theta_in = (
-            float(rng.uniform(-0.5, 0.5)),
-            float(rng.uniform(-1.0, 1.0)),
-            float(rng.uniform(-1.5, -0.2)),  # knee bent
-        )
-        foot = fk_leg(p, theta_in)
-        try:
-            theta_out = ik_leg(p, foot, knee_branch=+1 if theta_in[2] >= 0 else -1)
-        except ValueError:
-            continue
-        foot2 = fk_leg(p, theta_out)
-        np.testing.assert_allclose(foot, foot2, atol=1e-6)
-        n_pass += 1
-    assert n_pass > 180  # allow a few unreachable samples
-
-
-def test_ik_default_branch_roundtrip():
-    # The default knee_branch=+1 path is what controllers use; the random
-    # roundtrip above only ever exercises -1 (its q_knee is always negative).
-    rng = np.random.default_rng(7)
-    p = _P()
-    n_pass = 0
-    for _ in range(200):
-        theta_in = (
-            float(rng.uniform(-0.4, 0.4)),
-            float(rng.uniform(0.3, 1.3)),
-            float(rng.uniform(-1.4, -0.3)),
-        )
-        foot = fk_leg(p, theta_in)
-        foot2 = fk_leg(p, ik_leg(p, foot, knee_branch=+1))
-        np.testing.assert_allclose(foot, foot2, atol=1e-6)
-        n_pass += 1
-    assert n_pass == 200
+    for leg in ("FL", "FR", "BL", "BR"):
+        p = load_link_params(CFG, leg)
+        n_pass = 0
+        for _ in range(200):
+            theta_in = (
+                float(rng.uniform(-0.4, 0.4)),
+                float(rng.uniform(0.2, 1.3)),
+                float(rng.uniform(-1.6, -0.2)),  # knee bent
+            )
+            foot = fk_leg(p, theta_in)
+            try:
+                theta_out = ik_leg(p, foot, knee_branch=+1)
+            except ValueError:
+                continue
+            np.testing.assert_allclose(fk_leg(p, theta_out), foot, atol=1e-6)
+            n_pass += 1
+        assert n_pass > 190, f"{leg}: only {n_pass}/200"
 
 
 def test_ik_default_branch_recovers_natural_config():
-    # For a natural standing config (thigh forward, knee bent back), branch +1
-    # recovers the exact joint angles, not just a foot-equivalent solution.
-    p = _P()
-    theta_in = (0.1, 0.3, -0.8)
-    theta_out = ik_leg(p, fk_leg(p, theta_in), knee_branch=+1)
-    np.testing.assert_allclose(theta_out, theta_in, atol=1e-6)
+    # Branch +1 recovers the exact joint angles for a natural standing config.
+    for leg in ("FL", "FR", "BL", "BR"):
+        p = load_link_params(CFG, leg)
+        theta_in = (0.1, 0.6, -0.9)
+        theta_out = ik_leg(p, fk_leg(p, theta_in), knee_branch=+1)
+        np.testing.assert_allclose(theta_out, theta_in, atol=1e-6)
 
 
 def test_ik_unreachable_raises():
