@@ -168,35 +168,46 @@ Precondition unchanged: FreeCAD running, `RobotDog` doc has
 
 Replaces `kinematics_dh.py`. Same `dog_robot_kinematics` package.
 
+**Correction (found during Task 11):** each child joint sits partly **along the
+parent's Z axis** — the joint-to-joint vector in the parent frame is `(x, 0, z)`
+with `z` up to 41 mm, not `(L, 0, 0)`. A scalar link length + `Tx(L)` therefore
+does **not** reproduce the geometry (legs would be displaced 13–41 mm at each
+joint). So a joint is represented by its full fixed transform `(xyz, rpy)`, the
+standard URDF joint form. Left and right legs differ by mirror symmetry (the
+along-Z offsets flip sign), so transforms are stored **per side** (Left = FL+BL,
+Right = FR+BR), averaged within a side (intra-side spread < 0.2 mm).
+
 ```python
 @dataclass(frozen=True)
 class LinkParams:
-    L_hh: float        # ||J_thigh − J_hip||  (m)
-    L_th: float        # ||J_knee  − J_thigh|| (m)
-    L_sh: float        # ||J_foot  − J_knee||  (m)
-    R_const_ht: np.ndarray  # 3x3, hip→thigh constant rotation
-    R_const_tk: np.ndarray  # 3x3, thigh→shank constant rotation
-    R_const_kf: np.ndarray  # 3x3, shank→foot constant rotation
+    # Scalar link lengths (full 3D joint-to-joint distance) — for gait geometry.
+    L_hh: float; L_th: float; L_sh: float
+    # Fixed parent→child joint transforms (xyz translation + R rotation),
+    # for one side. F_i maps a child-frame point p to the parent: R_i @ p + t_i.
+    t_ht: np.ndarray; R_ht: np.ndarray   # hip  → thigh
+    t_tk: np.ndarray; R_tk: np.ndarray   # thigh→ shank
+    t_kf: np.ndarray; R_kf: np.ndarray   # shank→ foot
 
-def fk_leg(p: LinkParams, theta: tuple[float, float, float]) -> np.ndarray:
-    """Foot position in hip-yaw frame F_hip.
-    theta = (q_yaw, q_thigh, q_knee).
-    """
+def load_link_params(yaml_path, side: str) -> LinkParams:   # side in {"left","right"}
 
-def ik_leg(p: LinkParams, foot_in_hip: np.ndarray,
-           knee_branch: int = +1) -> tuple[float, float, float]:
-    """Closed-form 3R: hip yaw + 2R planar (thigh + knee)."""
+def fk_leg(p: LinkParams, theta) -> np.ndarray: ...
+def ik_leg(p: LinkParams, foot_in_hip, knee_branch=+1) -> tuple: ...
 ```
 
-**FK chain (joint-attached, no DH transforms):**
-- `T_yaw   = Rz(q_yaw)`
-- `T_h→t   = Tx(L_hh) · R_const_ht`
-- `T_thigh = Rz(q_thigh)`
-- `T_t→k   = Tx(L_th)  · R_const_tk`
-- `T_knee  = Rz(q_knee)`
-- `T_k→f   = Tx(L_sh)  · R_const_kf`
-- `foot_in_hip = (T_yaw · T_h→t · T_thigh · T_t→k · T_knee · T_k→f
+**FK chain** (`F_i = Trans(t_i) · Rot(R_i)`, a 4×4 that maps child→parent):
+- `foot_in_hip = (Rz(q_yaw) · F_ht · Rz(q_thigh) · F_tk · Rz(q_knee) · F_kf
                   · [0,0,0,1]ᵀ).xyz`
+
+`F_kf · [0,0,0,1]ᵀ = t_kf`, so the foot tip is `t_kf` in the post-knee frame;
+`R_kf` affects only foot orientation.
+
+**Why the 2R stays solvable:** `R_tk` is a pure `Rz` (thigh and knee axes are
+parallel), so in the thigh-root frame the foot's component along the thigh Z
+axis is **constant** (`t_tk_z + t_kf_z`), and its in-plane `(x, y)` is a standard
+2R with effective links `|t_tk_xy|`, `|t_kf_xy|` and a fixed angle offset from
+`R_tk`. `q_yaw` is still recovered from the two `Rz(q_yaw)`-invariants (foot Z and
+XY radius), now including the non-zero `t_ht` offset and the constant out-of-plane
+term.
 
 **IK closed form** (implemented; differs from the first-draft assumption):
 
@@ -219,16 +230,15 @@ The solver instead uses the two quantities that are invariant under `Rz(q_yaw)`
 `knee_branch=+1` recovers the natural FK config for a forward-thigh / bent-knee
 standing pose and is the branch controllers use.
 
-`R_const_kf` does not enter the IK position calculation — foot origin in
-shank frame is `(L_sh, 0, 0)` regardless of foot orientation. `R_const_kf`
-only matters when an upstream consumer needs foot **orientation**.
+`R_kf` does not enter the IK position calculation — the foot tip is `t_kf` in
+the post-knee frame regardless of foot orientation. `R_kf` only matters when an
+upstream consumer needs foot **orientation**.
 
-**Caveat — cross-leg averaging.** `L_hh/L_th/L_sh` and the three `R_const_*`
-are means over the four legs (SVD-reorthonormalised). `fk_leg(0,0,0)` therefore
-reproduces a single leg's measured foot to ~6 mm rather than exactly. This is
-acceptable for a symmetric robot; per-leg exact params would remove it if a
-future need arises. The visual STLs are still per-leg exact (each uses its own
-placement in `joint_frames.yaml`).
+**Caveat — per-side averaging.** Transforms are means over the two legs on a
+side (intra-side spread < 0.2 mm), so `fk_leg(0,0,0)` reproduces a single leg's
+measured foot to well under 1 mm — much tighter than the discarded cross-leg
+average. The visual STLs remain per-leg exact (each uses its own placement in
+`joint_frames.yaml`).
 
 **Errors:**
 - `|c| > 1` → `ValueError("foot unreachable")`
@@ -236,39 +246,29 @@ placement in `joint_frames.yaml`).
 
 ### 5.4 URDF (`leg.xacro`, `dog_robot.urdf.xacro`)
 
-`leg.xacro` macro:
+`leg.xacro` macro takes the full per-joint `xyz`+`rpy` (no scalar lengths):
 
 ```xml
 <xacro:macro name="leg" params="prefix
                                 base_to_hip_xyz base_to_hip_rpy
-                                L_hh L_th L_sh
-                                hip_to_thigh_rpy
-                                thigh_to_knee_rpy:='0 0 0'
-                                knee_to_foot_rpy:='0 0 0'">
+                                hip_to_thigh_xyz hip_to_thigh_rpy
+                                thigh_to_knee_xyz thigh_to_knee_rpy
+                                knee_to_foot_xyz knee_to_foot_rpy">
 ```
 
-Joint origins:
-- `hip_yaw`:     `xyz="${base_to_hip_xyz}"`, `rpy="${base_to_hip_rpy}"`, `axis="0 0 1"`
-- `thigh_pitch`: `xyz="${L_hh} 0 0"`,         `rpy="${hip_to_thigh_rpy}"`, `axis="0 0 1"`
-- `knee_pitch`:  `xyz="${L_th} 0 0"`,         `rpy="${thigh_to_knee_rpy}"`, `axis="0 0 1"`
-- `foot_fixed`:  `xyz="${L_sh} 0 0"`,         `rpy="${knee_to_foot_rpy}"`
+Joint origins (each the exact `(xyz, rpy)` from the link frames):
+- `hip_yaw`:     `xyz="${base_to_hip_xyz}"`,  `rpy="${base_to_hip_rpy}"`,  `axis="0 0 1"`
+- `thigh_pitch`: `xyz="${hip_to_thigh_xyz}"`, `rpy="${hip_to_thigh_rpy}"`, `axis="0 0 1"`
+- `knee_pitch`:  `xyz="${thigh_to_knee_xyz}"`,`rpy="${thigh_to_knee_rpy}"`,`axis="0 0 1"`
+- `foot_fixed`:  `xyz="${knee_to_foot_xyz}"`, `rpy="${knee_to_foot_rpy}"`
 
 All `<visual>`: `<origin xyz="0 0 0" rpy="0 0 0"/>`, mesh path
 `meshes/visual_dh/<link>.stl`.
 
-`dog_robot.urdf.xacro` properties (filled from `link_params.yaml` +
-`urdf_joints.yaml`):
-
-```xml
-<xacro:property name="L_hh" value="<derived>"/>
-<xacro:property name="L_th" value="<derived>"/>
-<xacro:property name="L_sh" value="<derived>"/>
-<xacro:property name="hip_to_thigh_rpy"  value="<derived>"/>
-<xacro:property name="thigh_to_knee_rpy" value="<derived>"/>
-<xacro:property name="knee_to_foot_rpy"  value="<derived>"/>
-```
-
-Per-leg `base_to_hip_xyz` / `rpy` read from `urdf_joints.yaml`.
+`dog_robot.urdf.xacro` defines two property sets (left / right) for the three
+leg-joint transforms (from `link_params.yaml`), and reads per-leg
+`base_to_hip_xyz`/`rpy` from `urdf_joints.yaml`. Each `<xacro:leg>` call passes
+the side-appropriate joint transforms: FL/BL → left, FR/BR → right.
 
 ---
 
