@@ -3,9 +3,9 @@
 
   <xacro:macro name="leg" params="prefix
                                   base_to_hip_xyz base_to_hip_rpy
-                                  L_hh L_th L_sh
-                                  d_thigh:='0' d_knee:='0' d_foot:='0'
-                                  alpha_thigh:='-1.5707963'
+                                  hip_to_thigh_xyz hip_to_thigh_rpy
+                                  thigh_to_knee_xyz thigh_to_knee_rpy
+                                  knee_to_foot_xyz knee_to_foot_rpy
                                   foot_sphere_xyz:='0 0 0'">
 
     <link name="${prefix}_hip_link">
@@ -54,7 +54,7 @@
     <joint name="${prefix}_thigh_pitch" type="revolute">
       <parent link="${prefix}_hip_link"/>
       <child link="${prefix}_thigh_link"/>
-      <origin xyz="${L_hh} ${d_thigh} 0" rpy="${alpha_thigh} 0 0"/>
+      <origin xyz="${hip_to_thigh_xyz}" rpy="${hip_to_thigh_rpy}"/>
       <axis xyz="0 0 1"/>
       <limit lower="-1.571" upper="1.571" effort="10.0" velocity="8.0"/>
       <dynamics damping="0.5" friction="0.0"/>
@@ -80,9 +80,9 @@
     <joint name="${prefix}_knee_pitch" type="revolute">
       <parent link="${prefix}_thigh_link"/>
       <child link="${prefix}_shank_link"/>
-      <origin xyz="${L_th} 0 ${d_knee}" rpy="0 0 0"/>
+      <origin xyz="${thigh_to_knee_xyz}" rpy="${thigh_to_knee_rpy}"/>
       <axis xyz="0 0 1"/>
-      <limit lower="0.0" upper="2.617" effort="10.0" velocity="8.0"/>
+      <limit lower="-2.617" upper="0.5" effort="10.0" velocity="8.0"/>
       <dynamics damping="0.5" friction="0.0"/>
     </joint>
 
@@ -106,7 +106,7 @@
     <joint name="${prefix}_foot_fixed" type="fixed">
       <parent link="${prefix}_shank_link"/>
       <child link="${prefix}_foot_link"/>
-      <origin xyz="${L_sh} 0 ${d_foot}" rpy="0 0 0"/>
+      <origin xyz="${knee_to_foot_xyz}" rpy="${knee_to_foot_rpy}"/>
     </joint>
 
   </xacro:macro>
