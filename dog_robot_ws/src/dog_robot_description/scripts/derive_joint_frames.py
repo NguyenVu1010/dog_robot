@@ -32,14 +32,18 @@ MEASURED_HIP_MM: Dict[str, Tuple[float, float, float]] = {
     "BR": (174.800, 12.500, -80.000),
 }
 MEASURED_THIGH_MM: Dict[str, Tuple[float, float, float]] = {
-    "FL": (0.000,   -0.671,   25.362),
-    "FR": (0.000,    0.000, -105.700),
+    # Front thigh/knee positions copied from back leg pattern (same offset
+    # from hip) so all 4 legs share identical link_params. Physical CAD
+    # thighs at original positions remain — visual meshes for FL/FR are
+    # post-bake replaced with BL/BR meshes for visual uniformity.
+    "FL": (50.400,  -0.675,   25.361),
+    "FR": (50.400,   0.000, -105.700),
     "BL": (200.000, -0.675,   25.361),
     "BR": (200.000,  0.000, -105.700),
 }
 MEASURED_KNEE_MM: Dict[str, Tuple[float, float, float]] = {
-    "FL": (88.875,  -65.224,   66.379),
-    "FR": (87.991,  -64.673, -148.400),
+    "FL": (133.810, -72.261,   66.183),
+    "FR": (133.387, -70.980, -148.400),
     "BL": (283.410, -72.261,   66.183),
     "BR": (282.987, -70.980, -148.400),
 }

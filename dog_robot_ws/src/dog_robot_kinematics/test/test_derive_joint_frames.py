@@ -114,15 +114,13 @@ def test_link_lengths_symmetric_across_legs():
     # L_hh ~38 mm (3D distance hip→thigh including lateral offset)
     assert lp["L_hh"] == pytest.approx(0.038, abs=5e-3)
     assert lp["L_th"] == pytest.approx(0.117, abs=5e-3)
-    assert lp["L_sh"] == pytest.approx(0.112, abs=5e-3)
-    # Per-leg breakdown also present. L_hh + L_th still close across legs (<3mm),
-    # but L_sh deviates more (front vs back shanks differ by ~30mm) because feet
-    # were re-anchored under hips with the same Y/Z but per-leg X mirror, and the
-    # original front/back leg geometries weren't symmetric.
+    assert lp["L_sh"] == pytest.approx(0.127, abs=5e-3)
+    # Per-leg breakdown: front legs copy back-leg pattern so all 4 legs share
+    # nearly identical link lengths (front/back differ by <2mm in CAD due to
+    # tiny measurement asymmetry).
     for leg in ("FL", "FR", "BL", "BR"):
-        for k in ("L_hh", "L_th"):
+        for k in ("L_hh", "L_th", "L_sh"):
             assert abs(lp["per_leg"][leg][k] - lp[k]) < 3e-3
-        assert abs(lp["per_leg"][leg]["L_sh"] - lp["L_sh"]) < 20e-3
 
 
 def test_constant_inter_link_rotations_present():
@@ -152,13 +150,11 @@ def test_leg_joint_transforms_exact():
             Op, Rp = fr[f"{leg}_{par}"]["O"], fr[f"{leg}_{par}"]["R"]
             Oc = fr[f"{leg}_{ch}"]["O"]
             np.testing.assert_allclose(xyz, Rp.T @ (Oc - Op), atol=1e-12)
-    # Front and back legs differ at the hip (slightly different thigh-offset
-    # pitch geometry), so per-leg storage is required. With hip axis uniformly
-    # body+X (REP-103), the FL vs BL difference is small but non-zero.
+    # Front legs copy back-leg pattern, so FL == BL and FR == BR hip->thigh.
     R_fl = lt["FL"]["hip_to_thigh"]["R"]
     R_bl = lt["BL"]["hip_to_thigh"]["R"]
     ang = np.degrees(np.arccos(np.clip((np.trace(R_fl.T @ R_bl) - 1) / 2, -1, 1)))
-    assert ang > 1.0
+    assert ang < 0.01
 
 
 def test_writes_three_yamls(tmp_path):
