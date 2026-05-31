@@ -70,7 +70,7 @@ def test_urdf_fk_matches_kinematics_link(leg):
     root = ET.fromstring(_expand_urdf())
     p = load_link_params(LINK_CFG, leg)
 
-    xyz_h, rpy_h = _joint_origin(root, f"{leg}_hip_yaw")
+    xyz_h, rpy_h = _joint_origin(root, f"{leg}_hip_roll")
     xyz_t, rpy_t = _joint_origin(root, f"{leg}_thigh_pitch")
     xyz_k, rpy_k = _joint_origin(root, f"{leg}_knee_pitch")
     xyz_f, rpy_f = _joint_origin(root, f"{leg}_foot_fixed")
@@ -89,7 +89,7 @@ def test_urdf_fk_matches_kinematics_link(leg):
              @ _T(_rpy_matrix(rpy_f), xyz_f))
         foot_base_urdf = T[:3, 3]
 
-        # kinematics_link FK gives foot in the hip-yaw frame; lift to base.
+        # kinematics_link FK gives foot in the hip frame; lift to base.
         foot_hip = fk_leg(p, q)
         foot_base_kin = (T_base_hip @ np.array([*foot_hip, 1.0]))[:3]
 

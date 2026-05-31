@@ -3,7 +3,7 @@
 Design choice: each leg's "neutral" foot position is `fk_leg(p, 0)` — the
 foot location when all 3 joints are zero. The gait oscillates around that
 neutral, so q stays near zero (well inside joint limits) and the IK never
-sees the foot on the hip yaw axis (which raises in `kinematics_link.ik_leg`).
+sees the foot on the hip rotation axis (which raises in `kinematics_link.ik_leg`).
 The body XY velocity is rotated into the leg's hip frame (by the caller)
 and scaled to a per-cycle stride vector.
 

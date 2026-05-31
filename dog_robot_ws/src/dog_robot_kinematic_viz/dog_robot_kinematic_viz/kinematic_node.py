@@ -23,7 +23,7 @@ from dog_robot_kinematic_viz.leg_driver import LegDriver
 from dog_robot_kinematic_viz.leg_geometry import LEG_NAMES, load_leg_geoms
 
 
-JOINT_SUFFIXES = ("hip_yaw", "thigh_pitch", "knee_pitch")
+JOINT_SUFFIXES = ("hip_roll", "thigh_pitch", "knee_pitch")
 
 
 def _all_joint_names() -> List[str]:

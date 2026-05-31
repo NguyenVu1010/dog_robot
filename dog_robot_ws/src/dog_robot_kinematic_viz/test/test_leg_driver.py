@@ -1,12 +1,10 @@
 """LegDriver: per-leg roundtrip + joint-limit guarantees over safe directions.
 
-The closed-form ik_leg has a non-convex workspace: FL/FR (front legs whose
-hip yaw axis is splayed ~45 deg from the body axis) have a foot that sits
-close to the hip yaw axis at the CAD-rest pose, so lateral displacements
-can fall outside reach. Body +/-x is uniformly reachable for all 4 legs
-at the gait velocity we expect (<=0.10 m/s). The tests below pin that
-operating region; the LegDriver's "hold last on ValueError" fallback
-covers the residual cases when a user commands large lateral velocity.
+The closed-form ik_leg has a non-convex workspace. Body +/-x is uniformly
+reachable for all 4 legs at the gait velocity we expect (<=0.10 m/s). The
+tests below pin that operating region; the LegDriver's "hold last on
+ValueError" fallback covers the residual cases when a user commands large
+lateral velocity.
 """
 from pathlib import Path
 
@@ -26,7 +24,7 @@ URDF_JOINTS_YAML = CFG / "urdf_joints.yaml"
 
 # Must mirror leg.xacro's <limit lower=... upper=...>.
 JOINT_LIMITS = {
-    "hip_yaw":     (-0.785, 0.785),
+    "hip_roll":     (-0.785, 0.785),
     "thigh_pitch": (-1.571, 1.571),
     "knee_pitch":  (-2.617, 0.5),
 }
@@ -46,7 +44,7 @@ def _make_drivers():
 
 
 def _assert_within_limits(name, q):
-    for joint_name, val in zip(("hip_yaw", "thigh_pitch", "knee_pitch"), q):
+    for joint_name, val in zip(("hip_roll", "thigh_pitch", "knee_pitch"), q):
         lo, hi = JOINT_LIMITS[joint_name]
         assert lo <= val <= hi, f"{name} {joint_name}={val} out of [{lo},{hi}]"
 
@@ -73,7 +71,7 @@ def test_zero_velocity_swing_phase_lifts_foot_within_limits(name):
         q = d.step((0.0, 0.0), phi)
         _assert_within_limits(name, q)
         # The hip yaw should still be ~0 since the foot moves only in z.
-        assert abs(q[0]) < 1e-3, f"{name} @ phi={phi}: hip_yaw={q[0]} drifted"
+        assert abs(q[0]) < 1e-3, f"{name} @ phi={phi}: hip_roll={q[0]} drifted"
 
 
 @pytest.mark.parametrize("name", LEG_NAMES)
@@ -116,14 +114,19 @@ def test_fk_of_step_matches_commanded_target_on_forward_velocity(name):
 
 
 def test_foot_at_rest_is_below_hip_for_all_legs():
+    # rest_in_hip is in the hip frame (where hip-Z = body +X after the REP-103
+    # convention switch). Convert to body frame and check the foot hangs below
+    # the hip (negative body Z).
     drivers = _make_drivers()
     for name, d in drivers.items():
-        assert d.rest_in_hip[2] < -0.05, f"{name} rest too shallow: {d.rest_in_hip}"
+        rest_body = d.geom.R_base_to_hip @ d.rest_in_hip
+        assert rest_body[2] < -0.05, (
+            f"{name} rest too shallow in body frame: {rest_body}")
 
 
 def test_unreachable_target_holds_last_joints():
-    # Synthesise an unreachable foot target by patching rest to the hip-yaw
-    # axis (where ik_leg raises). The driver must hold its previous q.
+    # Synthesise an unreachable foot target by patching rest to the hip
+    # rotation axis (where ik_leg raises). The driver must hold its previous q.
     geoms = load_leg_geoms(URDF_JOINTS_YAML)
     d = LegDriver(geoms["FL"], load_link_params(LINK_PARAMS_YAML, "FL"), PARAMS)
     q1 = d.step((0.0, 0.0), 0.0)

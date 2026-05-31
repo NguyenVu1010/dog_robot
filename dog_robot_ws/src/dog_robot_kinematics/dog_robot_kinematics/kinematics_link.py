@@ -74,7 +74,12 @@ def _T(R: np.ndarray, t: np.ndarray | None = None) -> np.ndarray:
 
 
 def fk_leg(p: LinkParams, theta: Tuple[float, float, float]) -> np.ndarray:
-    """Foot position (m) in hip-yaw frame. theta = (q_yaw, q_thigh, q_knee)."""
+    """Foot position (m) in hip frame. theta = (q_hip, q_thigh, q_knee).
+
+    Hip is the abduction/roll joint (axis = body +X per REP-103); thigh and
+    knee are pitch joints. All three are local-Z rotations after the link
+    frame reorientations captured in LinkParams.
+    """
     T = (_T(_Rz(theta[0]))
          @ _T(p.R_ht, p.t_ht) @ _T(_Rz(theta[1]))
          @ _T(p.R_tk, p.t_tk) @ _T(_Rz(theta[2]))
@@ -89,17 +94,17 @@ def ik_leg(p: LinkParams, foot_in_hip: np.ndarray,
     Geometry (see spec 5.3): the foot in the thigh-root frame has a constant
     component wz along the (parallel) thigh/knee Z axis and an in-plane (wx, wy)
     that is a 2R with effective links |t_tk_xy|, |t_kf_xy| and offset angle from
-    R_tk. q_yaw is solved from the two Rz(q_yaw)-invariants (foot Z and XY
+    R_tk. q_hip is solved from the two Rz(q_hip)-invariants (foot Z and XY
     radius), which include the non-zero t_ht offset and the constant wz term.
 
     knee_branch: +1 or -1 selects the quadratic root in wx. +1 recovers the
         natural forward-thigh / bent-knee config and is what controllers use.
-    Raises ValueError on unreachable target or yaw-undefined geometry.
+    Raises ValueError on unreachable target or hip-axis-undefined geometry.
     """
     x, y, z = float(foot_in_hip[0]), float(foot_in_hip[1]), float(foot_in_hip[2])
     r_xy = math.hypot(x, y)
     if r_xy < 1e-9:
-        raise ValueError("foot on hip yaw axis: q_yaw undefined")
+        raise ValueError("foot on hip rotation axis: q_hip undefined")
 
     c0 = p.R_ht[:, 0]
     c1 = p.R_ht[:, 1]
@@ -148,11 +153,11 @@ def ik_leg(p: LinkParams, foot_in_hip: np.ndarray,
     q_thigh = (math.atan2(wy, wx)
                - math.atan2(a2 * math.sin(phi), a1 + a2 * math.cos(phi)))
 
-    # q_yaw from foot = Rz(q_yaw) @ u.
+    # q_hip from foot = Rz(q_hip) @ u.
     u_x = B * wx + A
     u_y = D * wx + C
-    q_yaw = math.atan2(y, x) - math.atan2(u_y, u_x)
+    q_hip = math.atan2(y, x) - math.atan2(u_y, u_x)
     # wrap to (-pi, pi]
-    q_yaw = (q_yaw + math.pi) % (2.0 * math.pi) - math.pi
+    q_hip = (q_hip + math.pi) % (2.0 * math.pi) - math.pi
 
-    return (q_yaw, q_thigh, q_knee)
+    return (q_hip, q_thigh, q_knee)

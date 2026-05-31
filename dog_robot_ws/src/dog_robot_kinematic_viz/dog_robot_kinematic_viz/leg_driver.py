@@ -7,7 +7,7 @@ the class itself.
 
 The foot oscillates around the leg's CAD rest pose `fk_leg(link, (0,0,0))`
 so joint angles stay near zero (well inside limits) and the IK never
-hits the hip-yaw-axis singularity that ik_leg raises on.
+hits the hip-axis singularity that ik_leg raises on.
 """
 from __future__ import annotations
 from typing import Tuple

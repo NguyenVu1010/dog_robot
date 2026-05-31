@@ -32,17 +32,15 @@ def test_R_is_orthonormal():
         np.testing.assert_allclose(np.linalg.det(g.R_base_to_hip), 1.0, atol=1e-9)
 
 
-def test_yaw_only_for_all_legs():
-    # All four base_to_hip_rpy are pure yaw (roll = pitch = 0 in the
-    # joint_frames URDF); the R should reduce to Rz(yaw).
+def test_hip_local_z_aligns_with_body_x_for_all_legs():
+    # Per REP-103, the hip joint axis (local Z, since URDF <axis>=0 0 1) maps
+    # to body +X (forward) for every leg.
     geoms = load_leg_geoms(URDF_JOINTS)
     for g in geoms.values():
-        r, p, y = g.base_to_hip_rpy
-        assert abs(r) < 1e-9, f"{g.name} roll = {r}"
-        assert abs(p) < 1e-9, f"{g.name} pitch = {p}"
-        c, s = np.cos(y), np.sin(y)
-        Rz_only = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
-        np.testing.assert_allclose(g.R_base_to_hip, Rz_only, atol=1e-9)
+        # Column 2 of R_base_to_hip is the hip frame's Z axis in body coords.
+        np.testing.assert_allclose(
+            g.R_base_to_hip[:, 2], np.array([1.0, 0.0, 0.0]), atol=1e-9,
+            err_msg=f"{g.name} hip Z axis != body +X")
 
 
 def test_front_legs_y_sign_mirrors():

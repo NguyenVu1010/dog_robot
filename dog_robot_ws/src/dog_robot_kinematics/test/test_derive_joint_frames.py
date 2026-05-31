@@ -43,8 +43,8 @@ def test_joint_axes_normalized_and_oriented():
     for leg in ("FL", "FR", "BL", "BR"):
         for j, a in axes[leg].items():
             np.testing.assert_allclose(np.linalg.norm(a), 1.0, atol=1e-9)
-        # Hip yaw axis: URDF Z is the yaw axis.
-        np.testing.assert_allclose(axes[leg]["hip"], np.array([0., 0., 1.]), atol=1e-9)
+        # Hip roll axis: URDF X (forward, ROS REP-103).
+        np.testing.assert_allclose(axes[leg]["hip"], np.array([1., 0., 0.]), atol=1e-9)
         # Thigh + knee pitch axes: URDF Y after CAD→URDF map; sign normalised positive.
         np.testing.assert_allclose(axes[leg]["thigh"], np.array([0., 1., 0.]), atol=1e-9)
         np.testing.assert_allclose(axes[leg]["knee"],  np.array([0., 1., 0.]), atol=1e-9)
@@ -69,10 +69,10 @@ def test_hip_link_frame_basic_geometry_fl():
     info = frames["FL_hip_link"]
     expected_O = djf.joint_centers_urdf()["FL"]["hip"]
     np.testing.assert_allclose(info["O"], expected_O, atol=1e-12)
-    # Z axis is hip yaw axis (URDF Z)
-    np.testing.assert_allclose(info["R"][:, 2], np.array([0., 0., 1.]), atol=1e-9)
-    # X axis lies in the XY plane (Z component ~ 0 after orthogonalisation)
-    assert abs(info["R"][2, 0]) < 1e-9
+    # Z axis is the hip rotation axis = body +X (REP-103)
+    np.testing.assert_allclose(info["R"][:, 2], np.array([1., 0., 0.]), atol=1e-9)
+    # X axis lies in the YZ plane (X component ~ 0 after orthogonalisation)
+    assert abs(info["R"][0, 0]) < 1e-9
 
 
 def test_base_and_foot_use_world_aligned_frame():
@@ -148,13 +148,13 @@ def test_leg_joint_transforms_exact():
             Op, Rp = fr[f"{leg}_{par}"]["O"], fr[f"{leg}_{par}"]["R"]
             Oc = fr[f"{leg}_{ch}"]["O"]
             np.testing.assert_allclose(xyz, Rp.T @ (Oc - Op), atol=1e-12)
-    # Front and back legs differ at the hip (thigh points forward vs backward),
-    # so the hip->thigh ROTATION differs substantially between FL and BL — this
-    # is why per-leg (not per-side) transforms are required.
+    # Front and back legs differ at the hip (slightly different thigh-offset
+    # pitch geometry), so per-leg storage is required. With hip axis uniformly
+    # body+X (REP-103), the FL vs BL difference is small but non-zero.
     R_fl = lt["FL"]["hip_to_thigh"]["R"]
     R_bl = lt["BL"]["hip_to_thigh"]["R"]
     ang = np.degrees(np.arccos(np.clip((np.trace(R_fl.T @ R_bl) - 1) / 2, -1, 1)))
-    assert ang > 30.0
+    assert ang > 1.0
 
 
 def test_writes_three_yamls(tmp_path):

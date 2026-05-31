@@ -71,12 +71,15 @@ def cad_to_urdf_direction(v_cad) -> np.ndarray:
 
 
 # CAD axis directions for joints derived from FreeCAD circle inspection.
-# Hip is intentionally omitted: hip yaw is the world Z axis by URDF
-# convention regardless of how the CAD shaft is oriented.
+# Hip is set to URDF body +X (forward) per ROS REP-103: first leg joint is the
+# hip-roll / abduction joint, rotating the leg in the YZ body plane.
 CAD_AXIS = {
-    "thigh": np.array([0.0, 0.0, 1.0]),  # CAD Z -> URDF +Y
-    "knee":  np.array([0.0, 0.0, 1.0]),  # CAD Z -> URDF +Y
+    "thigh": np.array([0.0, 0.0, 1.0]),  # CAD Z -> URDF +Y (pitch axis)
+    "knee":  np.array([0.0, 0.0, 1.0]),  # CAD Z -> URDF +Y (pitch axis)
 }
+
+# Hip rotation axis in URDF body frame (uniform across 4 legs).
+HIP_AXIS_URDF = np.array([1.0, 0.0, 0.0])
 
 
 def joint_axes_urdf() -> Dict[str, Dict[str, np.ndarray]]:
@@ -87,7 +90,7 @@ def joint_axes_urdf() -> Dict[str, Dict[str, np.ndarray]]:
     """
     out: Dict[str, Dict[str, np.ndarray]] = {}
     for leg in ("FL", "FR", "BL", "BR"):
-        leg_axes: Dict[str, np.ndarray] = {"hip": np.array([0.0, 0.0, 1.0])}
+        leg_axes: Dict[str, np.ndarray] = {"hip": HIP_AXIS_URDF.copy()}
         for jname, vc in CAD_AXIS.items():
             v = cad_to_urdf_direction(vc)
             v = v / np.linalg.norm(v)

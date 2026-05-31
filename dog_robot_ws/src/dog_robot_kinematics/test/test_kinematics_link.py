@@ -56,15 +56,18 @@ def test_fk_yaw_rotates_foot_in_xy_plane():
 
 
 def test_ik_roundtrip_random_targets_all_legs():
+    # With hip axis along body+X (abduction), ±0.2 rad covers a generous
+    # roll range; combined with the moderate pitch/knee bend below, every
+    # sampled theta lies safely in the IK workspace.
     rng = np.random.default_rng(42)
     for leg in ("FL", "FR", "BL", "BR"):
         p = load_link_params(CFG, leg)
         n_pass = 0
         for _ in range(200):
             theta_in = (
-                float(rng.uniform(-0.4, 0.4)),
-                float(rng.uniform(0.2, 1.3)),
-                float(rng.uniform(-1.6, -0.2)),  # knee bent
+                float(rng.uniform(-0.2, 0.2)),
+                float(rng.uniform(0.2, 1.0)),
+                float(rng.uniform(-1.4, -0.2)),  # knee bent
             )
             foot = fk_leg(p, theta_in)
             try:

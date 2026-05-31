@@ -43,10 +43,10 @@ def rclpy_ctx():
 
 def test_all_joint_names_canonical_order():
     assert _all_joint_names() == [
-        "FL_hip_yaw", "FL_thigh_pitch", "FL_knee_pitch",
-        "FR_hip_yaw", "FR_thigh_pitch", "FR_knee_pitch",
-        "BL_hip_yaw", "BL_thigh_pitch", "BL_knee_pitch",
-        "BR_hip_yaw", "BR_thigh_pitch", "BR_knee_pitch",
+        "FL_hip_roll", "FL_thigh_pitch", "FL_knee_pitch",
+        "FR_hip_roll", "FR_thigh_pitch", "FR_knee_pitch",
+        "BL_hip_roll", "BL_thigh_pitch", "BL_knee_pitch",
+        "BR_hip_roll", "BR_thigh_pitch", "BR_knee_pitch",
     ]
 
 
@@ -73,7 +73,7 @@ def test_node_publishes_12_joints_and_reacts_to_cmd_vel(rclpy_ctx):
     assert received, "no /joint_states received during warm-up"
     msg = received[-1]
     assert len(msg.name) == 12 and len(msg.position) == 12
-    assert msg.name[0] == "FL_hip_yaw"
+    assert msg.name[0] == "FL_hip_roll"
     # Idle = (0,0,0) per leg, swing phases may lift the foot so some joints
     # are non-zero. But the *order of magnitude* should be small.
     assert max(abs(p) for p in msg.position) < 1.0
