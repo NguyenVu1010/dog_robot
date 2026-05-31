@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Kill stale processes, rebuild, launch the Gazebo-free kinematic viz.
+# Kill stale processes, build, launch the kinematic-only RViz rig.
 #
 # Plain `colcon build` (no --symlink-install): setuptools >=81 broke colcon's
 # symlink/develop path, but copy-install works fine for ament_python and
