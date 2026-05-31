@@ -48,10 +48,10 @@ MEASURED_KNEE_MM: Dict[str, Tuple[float, float, float]] = {
 # *_foot_fixed entries). To regenerate, run
 #   python3 scripts/compute_joints.py 2>&1 | grep foot_fixed
 MEASURED_FOOT_MM: Dict[str, Tuple[float, float, float]] = {
-    "FL": (32.3,  -102.4,   47.2),
-    "FR": (31.6,  -102.7, -130.1),
-    "BL": (223.2, -102.6,   47.1),
-    "BR": (222.4, -102.7, -130.0),
+    "FL": (32.3,  -134.29,   47.2),
+    "FR": (31.6,  -134.29, -130.1),
+    "BL": (223.2, -134.29,   47.1),
+    "BR": (222.4, -134.29, -130.0),
 }
 
 
