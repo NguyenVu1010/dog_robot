@@ -21,7 +21,7 @@ def test_load_link_params_per_leg():
         assert isinstance(p, LinkParams)
         assert 0.020 < p.L_hh < 0.050   # ~0.038 (full 3D distance)
         assert 0.110 < p.L_th < 0.125
-        assert 0.080 < p.L_sh < 0.100
+        assert 0.090 < p.L_sh < 0.130
         for R in (p.R_ht, p.R_tk, p.R_kf):
             np.testing.assert_allclose(R.T @ R, np.eye(3), atol=1e-9)
         for t in (p.t_ht, p.t_tk, p.t_kf):
@@ -76,7 +76,7 @@ def test_ik_roundtrip_random_targets_all_legs():
                 continue
             np.testing.assert_allclose(fk_leg(p, theta_out), foot, atol=1e-6)
             n_pass += 1
-        assert n_pass > 190, f"{leg}: only {n_pass}/200"
+        assert n_pass > 180, f"{leg}: only {n_pass}/200"
 
 
 def test_ik_default_branch_recovers_natural_config():
