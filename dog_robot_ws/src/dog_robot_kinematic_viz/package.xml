@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>dog_robot_kinematic_viz</name>
+  <version>0.1.0</version>
+  <description>Gazebo-free kinematic verification rig: cmd_vel -&gt; per-leg LegDriver -&gt; ik_leg -&gt; /joint_states -&gt; RViz. Body anchored at a static world-&gt;base_link transform.</description>
+  <maintainer email="nguyenvd11@fpt.com">nguyenvd</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>dog_robot_description</exec_depend>
+  <exec_depend>dog_robot_kinematics</exec_depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
