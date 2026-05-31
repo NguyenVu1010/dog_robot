@@ -2,8 +2,7 @@
 import subprocess
 from pathlib import Path
 
-PROJECT_ROOT = Path("/home/nguyenvd/workspace/dog_robot")
-URDF_XACRO = PROJECT_ROOT / "dog_robot_ws/src/dog_robot_description/urdf/dog_robot.urdf.xacro"
+URDF_XACRO = Path(__file__).resolve().parent.parent / "urdf" / "dog_robot.urdf.xacro"
 
 
 def test_xacro_processes():

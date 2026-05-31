@@ -1,19 +1,17 @@
 #!/usr/bin/env bash
-# Kill orphan dog_robot sim processes. Use full-cmdline match (-f) since several
-# names exceed pkill's 15-char limit, and run from a script file to avoid
-# pkill matching its own shell command line.
-# Two-pass: SIGTERM first to let processes shut down cleanly, then SIGKILL
-# anything still alive after 1s. gzserver in particular can wedge and ignore
-# SIGTERM, leaving a zombie that conflicts with the next launch.
+# Kill orphan dog_robot kinematic-viz processes. Run from a script file to
+# avoid pkill matching its own shell command line, and use -f because some
+# node names exceed pkill's 15-char limit (see feedback_pkill_dog_robot_orphans).
+# Two-pass: SIGTERM, then SIGKILL anything still alive after 1s.
 set +e
 
 PATTERNS=(
-  gzserver gzclient ros_gz_bridge spawn_entity
-  robot_state_publisher joint_state_broadcaster
-  joint_trajectory_controller controller_manager
-  ros2_control_node ros2_control gazebo_ros2_control
-  stand_controller walker_controller rviz2
-  champ_base champ_gazebo
+  robot_state_publisher
+  static_transform_publisher
+  kinematic_node
+  teleop_keyboard
+  rviz2
+  "ros2 launch"
 )
 
 for p in "${PATTERNS[@]}"; do pkill    -f "$p"; done

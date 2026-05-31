@@ -4,7 +4,7 @@ project(dog_robot_description)
 find_package(ament_cmake REQUIRED)
 
 install(
-  DIRECTORY urdf meshes config launch rviz
+  DIRECTORY urdf meshes config rviz
   DESTINATION share/${PROJECT_NAME}
 )
 
