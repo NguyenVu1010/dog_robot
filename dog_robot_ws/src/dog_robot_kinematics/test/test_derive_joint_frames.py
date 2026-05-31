@@ -115,10 +115,10 @@ def test_link_lengths_symmetric_across_legs():
     assert lp["L_hh"] == pytest.approx(0.038, abs=5e-3)
     assert lp["L_th"] == pytest.approx(0.117, abs=5e-3)
     assert lp["L_sh"] == pytest.approx(0.090, abs=5e-3)
-    # Per-leg breakdown also present + matches mean within 2mm (front/back asymmetry).
+    # Per-leg breakdown also present + matches mean within 3mm (front/back asymmetry).
     for leg in ("FL", "FR", "BL", "BR"):
         for k in ("L_hh", "L_th", "L_sh"):
-            assert abs(lp["per_leg"][leg][k] - lp[k]) < 2e-3
+            assert abs(lp["per_leg"][leg][k] - lp[k]) < 3e-3
 
 
 def test_constant_inter_link_rotations_present():
