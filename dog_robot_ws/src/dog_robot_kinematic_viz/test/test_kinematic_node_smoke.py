@@ -243,3 +243,34 @@ def test_foot_trail_points_in_base_link_frame(rclpy_ctx):
 
     node.destroy_node()
     listener.destroy_node()
+
+
+def test_inactive_legs_have_empty_foot_trail_markers(rclpy_ctx):
+    from visualization_msgs.msg import MarkerArray
+    # Only FL is active -> FR/BL/BR markers should exist but be empty.
+    node = KinematicNode(parameter_overrides=_overrides(
+        active_legs=["FL"], idle_joints=[0.0, 0.0, 0.0]))
+
+    listener = rclpy.create_node("trail_active_listener")
+    received: list[MarkerArray] = []
+    listener.create_subscription(
+        MarkerArray, "/foot_trails", lambda m: received.append(m), 10)
+
+    ex = SingleThreadedExecutor()
+    ex.add_node(node)
+    ex.add_node(listener)
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 0.3:
+        ex.spin_once(timeout_sec=0.02)
+
+    assert received
+    msg = received[-1]
+    assert len(msg.markers) == 4
+    # marker_id order matches LEG_NAMES = ("FL", "FR", "BL", "BR").
+    fl, fr, bl, br = msg.markers
+    assert fl.id == 0 and len(fl.points) > 0, "FL active should have points"
+    for m, name in [(fr, "FR"), (bl, "BL"), (br, "BR")]:
+        assert len(m.points) == 0, f"{name} inactive but has {len(m.points)} points"
+
+    node.destroy_node()
+    listener.destroy_node()

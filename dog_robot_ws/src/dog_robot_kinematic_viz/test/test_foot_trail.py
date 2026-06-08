@@ -77,12 +77,6 @@ def test_append_rejects_wrong_shape():
 vis_msgs = pytest.importorskip("visualization_msgs")
 from visualization_msgs.msg import Marker   # noqa: E402
 
-try:
-    import rclpy   # noqa: F401
-    _has_rclpy = True
-except ImportError:
-    _has_rclpy = False
-
 
 def _stub_stamp():
     """Builtins Time-like stub for tests not running rclpy."""

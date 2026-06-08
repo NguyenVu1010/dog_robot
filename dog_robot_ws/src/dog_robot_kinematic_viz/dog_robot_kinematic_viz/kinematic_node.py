@@ -136,21 +136,19 @@ class KinematicNode(Node):
                 q = self._idle
             positions.extend(float(x) for x in q)
 
+        stamp = self.get_clock().now().to_msg()
         msg = JointState()
-        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.stamp = stamp
         msg.name = self._joint_names
         msg.position = positions
         self._pub.publish(msg)
 
         trail_msg = MarkerArray()
-        stamp = self.get_clock().now().to_msg()
         for idx, leg in enumerate(LEG_NAMES):
             if leg in self.drivers:
                 d = self.drivers[leg]
-                # The 3 joint angles for this leg are the same we just published.
-                # Find them at positions[3*idx_in_LEG_NAMES : +3].
-                leg_idx = LEG_NAMES.index(leg)
-                q = tuple(positions[3 * leg_idx : 3 * leg_idx + 3])
+                # Reuse the joint positions already computed above.
+                q = tuple(positions[3 * idx : 3 * idx + 3])
                 foot_hip = fk_leg(d.link, q)
                 foot_body = d.geom.base_to_hip_xyz + d.geom.R_base_to_hip @ foot_hip
                 self._trails[leg].append(foot_body)
