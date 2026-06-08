@@ -62,16 +62,16 @@ def test_zero_velocity_stance_phase_recovers_zero_joints(name):
 
 
 @pytest.mark.parametrize("name", LEG_NAMES)
-def test_zero_velocity_swing_phase_lifts_foot_within_limits(name):
-    # Swing with no body velocity => foot rises in z, XY at rest => q != 0
-    # but all within joint limits.
+def test_zero_velocity_full_cycle_holds_rest_joints(name):
+    # After swing-scales-with-velocity, v=0 means stance AND swing produce
+    # zero foot motion -> q ~ (0,0,0) at every phase.
     drivers = _make_drivers()
     d = drivers[name]
-    for phi in (0.5, 0.625, 0.75, 0.875, 0.999):
+    for phi in (0.0, 0.1, 0.25, 0.4, 0.5, 0.625, 0.75, 0.875, 0.999):
         q = d.step((0.0, 0.0), phi)
-        _assert_within_limits(name, q)
-        # The hip yaw should still be ~0 since the foot moves only in z.
-        assert abs(q[0]) < 1e-3, f"{name} @ phi={phi}: hip_roll={q[0]} drifted"
+        np.testing.assert_allclose(
+            q, (0.0, 0.0, 0.0), atol=1e-6,
+            err_msg=f"{name} @ phi={phi}: q={q} drifted from rest")
 
 
 @pytest.mark.parametrize("name", LEG_NAMES)

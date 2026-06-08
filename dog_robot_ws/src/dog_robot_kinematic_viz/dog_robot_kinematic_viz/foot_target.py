@@ -12,6 +12,10 @@ Phase convention (phi in [0, 1)):
     stance_phase_ratio .. 1     swing : foot returns + lifts (sin arch)
 Continuity is enforced at phi = stance_phase_ratio and at phi = 1 -> 0:
     foot_target is C0 continuous across both seams.
+
+Swing lift scaling: swing lift scales linearly with |v_hip_xy| from 0 at v=0
+    to full swing_height at |v| >= swing_activation_speed. This ensures legs
+    hold still when /cmd_vel is zero.
 """
 from __future__ import annotations
 from dataclasses import dataclass
@@ -24,6 +28,7 @@ class FootTargetParams:
     stride_per_mps: float = 0.20          # stride magnitude per m/s of body vel
     swing_height: float = 0.03            # peak lift above stance plane (m)
     stance_phase_ratio: float = 0.5       # fraction of cycle spent in stance
+    swing_activation_speed: float = 0.05  # m/s; |v| above which lift is full
 
 
 def foot_target_in_hip(rest_in_hip: np.ndarray,
@@ -41,6 +46,8 @@ def foot_target_in_hip(rest_in_hip: np.ndarray,
     r = params.stance_phase_ratio
     sx = params.stride_per_mps * float(v_hip_xy[0])
     sy = params.stride_per_mps * float(v_hip_xy[1])
+    v_mag = float(np.hypot(v_hip_xy[0], v_hip_xy[1]))
+    swing_scale = min(1.0, v_mag / params.swing_activation_speed)
 
     if phi < r:
         # Stance: linear forward -> backward along stride (scale +0.5 -> -0.5).
@@ -51,7 +58,7 @@ def foot_target_in_hip(rest_in_hip: np.ndarray,
         # Swing: linear backward -> forward (scale -0.5 -> +0.5) with sin lift.
         u = (phi - r) / (1.0 - r)
         scale = -0.5 + u
-        z_lift = params.swing_height * np.sin(np.pi * u)
+        z_lift = params.swing_height * np.sin(np.pi * u) * swing_scale
 
     return np.array([
         rest_in_hip[0] + sx * scale,

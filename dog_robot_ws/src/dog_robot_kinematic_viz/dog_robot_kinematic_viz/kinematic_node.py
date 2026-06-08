@@ -49,6 +49,7 @@ class KinematicNode(Node):
         self.declare_parameter("stride_per_mps", 0.20)
         self.declare_parameter("swing_height", 0.03)
         self.declare_parameter("stance_phase_ratio", 0.5)
+        self.declare_parameter("swing_activation_speed", 0.05)
         self.declare_parameter("body_z_min", -0.03)
         self.declare_parameter("body_z_max", +0.03)
 
@@ -74,6 +75,8 @@ class KinematicNode(Node):
             swing_height=float(self.get_parameter("swing_height").value),
             stance_phase_ratio=float(
                 self.get_parameter("stance_phase_ratio").value),
+            swing_activation_speed=float(
+                self.get_parameter("swing_activation_speed").value),
         )
 
         # ----- runtime state -----
