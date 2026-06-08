@@ -136,7 +136,7 @@ def test_linear_z_drives_body_height_state(rclpy_ctx):
     # Publishing linear.z > 0 must move feet DOWN in body Z relative to the
     # zero-input baseline (because body_z > 0 means body rises, feet press
     # further down).  We assert the joint snapshot diverges from baseline.
-    node = KinematicNode(parameter_overrides=_overrides())
+    node = KinematicNode(parameter_overrides=_overrides(step_freq=0.0))
 
     listener = rclpy.create_node("body_z_listener")
     received: list[JointState] = []
@@ -158,7 +158,7 @@ def test_linear_z_drives_body_height_state(rclpy_ctx):
     assert received, "no /joint_states received during warm-up"
     snapshot_pre = list(received[-1].position)
 
-    # Drive body up at 0.04 m/s for ~0.5 s -> body_z ~ +0.02 (well below the
+    # Drive body up at 0.04 m/s for ~0.6 s -> body_z ~ +0.024 (below the
     # +0.03 default clamp).
     twist = Twist()
     twist.linear.z = 0.04
