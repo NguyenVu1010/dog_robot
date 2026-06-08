@@ -47,7 +47,8 @@ def foot_target_in_hip(rest_in_hip: np.ndarray,
     sx = params.stride_per_mps * float(v_hip_xy[0])
     sy = params.stride_per_mps * float(v_hip_xy[1])
     v_mag = float(np.hypot(v_hip_xy[0], v_hip_xy[1]))
-    swing_scale = min(1.0, v_mag / params.swing_activation_speed)
+    s = params.swing_activation_speed
+    swing_scale = 1.0 if s <= 0.0 else min(1.0, v_mag / s)
 
     if phi < r:
         # Stance: linear forward -> backward along stride (scale +0.5 -> -0.5).

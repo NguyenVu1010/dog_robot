@@ -10,6 +10,7 @@ from dog_robot_kinematic_viz.foot_target import (
 REST = np.array([0.03, 0.04, -0.12])
 PARAMS = FootTargetParams(stride_per_mps=0.20, swing_height=0.03,
                           stance_phase_ratio=0.5)
+PHI_APEX = PARAMS.stance_phase_ratio + 0.5 * (1.0 - PARAMS.stance_phase_ratio)
 
 
 def test_zero_velocity_holds_rest():
@@ -95,14 +96,14 @@ def test_y_stride_independent_of_x_stride():
 
 
 def test_zero_velocity_no_swing_lift_at_any_phase():
-    # Explicit: even at the swing apex (phi=0.75), z must equal REST[2] at v=0.
-    p = foot_target_in_hip(REST, 0.75, (0.0, 0.0), PARAMS)
+    # Explicit: even at the swing apex, z must equal REST[2] at v=0.
+    p = foot_target_in_hip(REST, PHI_APEX, (0.0, 0.0), PARAMS)
     assert p[2] == pytest.approx(REST[2], abs=1e-12)
 
 
 def test_swing_lift_scales_linearly_below_activation_speed():
     # At swing apex (u=0.5 -> sin=1), z_lift = swing_height * (|v|/v_act).
-    phi_apex = 0.75
+    phi_apex = PHI_APEX
     v_act = PARAMS.swing_activation_speed
     # v = 25% of v_act -> 25% of swing_height
     p_25 = foot_target_in_hip(REST, phi_apex, (0.25 * v_act, 0.0), PARAMS)
@@ -116,7 +117,7 @@ def test_swing_lift_scales_linearly_below_activation_speed():
 
 def test_swing_lift_saturates_at_activation_speed():
     # |v| >= swing_activation_speed -> full lift, no further increase.
-    phi_apex = 0.75
+    phi_apex = PHI_APEX
     p_at = foot_target_in_hip(REST, phi_apex, (PARAMS.swing_activation_speed, 0.0),
                               PARAMS)
     p_2x = foot_target_in_hip(REST, phi_apex, (2.0 * PARAMS.swing_activation_speed, 0.0),
@@ -127,9 +128,24 @@ def test_swing_lift_saturates_at_activation_speed():
 
 def test_lateral_velocity_also_activates_swing():
     # Symmetric in x and y: pure y velocity must lift the foot the same as pure x.
-    phi_apex = 0.75
+    phi_apex = PHI_APEX
     p_x = foot_target_in_hip(REST, phi_apex, (PARAMS.swing_activation_speed, 0.0),
                              PARAMS)
     p_y = foot_target_in_hip(REST, phi_apex, (0.0, PARAMS.swing_activation_speed),
                              PARAMS)
     assert p_x[2] == pytest.approx(p_y[2], abs=1e-12)
+
+
+def test_zero_activation_speed_disables_scaling():
+    # swing_activation_speed=0 means "no threshold" -> always full lift.
+    params = FootTargetParams(stride_per_mps=0.20, swing_height=0.03,
+                              stance_phase_ratio=0.5,
+                              swing_activation_speed=0.0)
+    phi_apex = params.stance_phase_ratio + 0.5 * (1.0 - params.stance_phase_ratio)
+    # Even at tiny v, full lift applies.
+    p = foot_target_in_hip(REST, phi_apex, (1e-9, 0.0), params)
+    assert p[2] == pytest.approx(REST[2] + params.swing_height, abs=1e-12)
+    # At v=0, hypot=0 so v_mag/s would still be 0/0; the guard returns 1.0.
+    # But sin(pi*0.5)=1, so z_lift = swing_height * 1 = full lift.
+    p0 = foot_target_in_hip(REST, phi_apex, (0.0, 0.0), params)
+    assert p0[2] == pytest.approx(REST[2] + params.swing_height, abs=1e-12)
