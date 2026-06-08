@@ -1,6 +1,8 @@
 """TeleopKeyboard key handling: r/f drive vz, space zeros all 4 axes, /cmd_vel
 publishes linear.z. Skipped when rclpy is unavailable.
 """
+import time
+
 import pytest
 
 rclpy = pytest.importorskip("rclpy")
@@ -77,9 +79,14 @@ def test_publish_emits_linear_z(rclpy_ctx):
     listener.create_subscription(
         Twist, "/cmd_vel", lambda m: received.append(m), 10)
 
+    # Warm up DDS so the subscription is matched before publish.
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 0.1:
+        rclpy.spin_once(node, timeout_sec=0.01)
+        rclpy.spin_once(listener, timeout_sec=0.01)
+
     node.on_key("r")   # vz = +LIN_STEP, also calls publish()
-    # Spin listener a few times to receive.
-    import time
+
     t0 = time.monotonic()
     while time.monotonic() - t0 < 0.3 and not received:
         rclpy.spin_once(listener, timeout_sec=0.02)
