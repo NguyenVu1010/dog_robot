@@ -183,3 +183,63 @@ def test_body_z_range_params_passed_to_commander(rclpy_ctx):
     assert node.commander.body_z_min == pytest.approx(-0.10)
     assert node.commander.body_z_max == pytest.approx(+0.10)
     node.destroy_node()
+
+
+def test_publishes_foot_trails_marker_array(rclpy_ctx):
+    from visualization_msgs.msg import MarkerArray
+    node = KinematicNode(parameter_overrides=_overrides())
+
+    listener = rclpy.create_node("trail_listener")
+    received: list[MarkerArray] = []
+    listener.create_subscription(
+        MarkerArray, "/foot_trails", lambda m: received.append(m), 10)
+
+    ex = SingleThreadedExecutor()
+    ex.add_node(node)
+    ex.add_node(listener)
+
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 0.4:
+        ex.spin_once(timeout_sec=0.02)
+
+    assert received, "no MarkerArray received"
+    msg = received[-1]
+    assert len(msg.markers) == 4
+    # marker_id 0..3 corresponds to LEG_NAMES order.
+    for i, m in enumerate(msg.markers):
+        assert m.ns == "foot_trail"
+        assert m.id == i
+        # Trail should have grown across the warm-up window.
+        assert len(m.points) > 0, f"marker {i}: no points appended"
+
+    node.destroy_node()
+    listener.destroy_node()
+
+
+def test_foot_trail_points_in_base_link_frame(rclpy_ctx):
+    from visualization_msgs.msg import MarkerArray
+    node = KinematicNode(parameter_overrides=_overrides(step_freq=0.0))
+
+    listener = rclpy.create_node("trail_frame_listener")
+    received: list[MarkerArray] = []
+    listener.create_subscription(
+        MarkerArray, "/foot_trails", lambda m: received.append(m), 10)
+
+    ex = SingleThreadedExecutor()
+    ex.add_node(node)
+    ex.add_node(listener)
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 0.3:
+        ex.spin_once(timeout_sec=0.02)
+
+    assert received
+    msg = received[-1]
+    for m in msg.markers:
+        assert m.header.frame_id == "base_link"
+        # At v=0 + step_freq=0, the foot stays at rest pose - sanity check
+        # that the points are near the body's lower half (z < 0 in body frame).
+        if m.points:
+            assert m.points[-1].z < 0.0, f"marker {m.id}: foot z >= 0"
+
+    node.destroy_node()
+    listener.destroy_node()

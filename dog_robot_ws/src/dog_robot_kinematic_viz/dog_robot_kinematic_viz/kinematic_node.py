@@ -15,10 +15,12 @@ from geometry_msgs.msg import Twist
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 
-from dog_robot_kinematics.kinematics_link import load_link_params
+from dog_robot_kinematics.kinematics_link import load_link_params, fk_leg
+from visualization_msgs.msg import MarkerArray
 
 from dog_robot_kinematic_viz.body_commander import BodyCommander
 from dog_robot_kinematic_viz.foot_target import FootTargetParams
+from dog_robot_kinematic_viz.foot_trail import FootTrail, LEG_COLORS, build_marker
 from dog_robot_kinematic_viz.leg_driver import LegDriver
 from dog_robot_kinematic_viz.leg_geometry import LEG_NAMES, load_leg_geoms
 
@@ -52,6 +54,7 @@ class KinematicNode(Node):
         self.declare_parameter("swing_activation_speed", 0.05)
         self.declare_parameter("body_z_min", -0.03)
         self.declare_parameter("body_z_max", +0.03)
+        self.declare_parameter("foot_trail_max_points", 300)
 
         publish_rate = float(self.get_parameter("publish_rate").value)
         active = list(self.get_parameter("active_legs").value)
@@ -97,6 +100,14 @@ class KinematicNode(Node):
             Twist, "/cmd_vel", self._on_cmd_vel, 10)
         self._pub = self.create_publisher(JointState, "/joint_states", 10)
 
+        max_pts = int(self.get_parameter("foot_trail_max_points").value)
+        self._trails: Dict[str, FootTrail] = {
+            name: FootTrail(name=name, color=LEG_COLORS[name], max_points=max_pts)
+            for name in LEG_NAMES
+        }
+        self._trail_pub = self.create_publisher(
+            MarkerArray, "/foot_trails", 10)
+
         self._t_last = time.monotonic()
         self._timer = self.create_timer(1.0 / publish_rate, self._tick)
 
@@ -130,6 +141,23 @@ class KinematicNode(Node):
         msg.name = self._joint_names
         msg.position = positions
         self._pub.publish(msg)
+
+        trail_msg = MarkerArray()
+        stamp = self.get_clock().now().to_msg()
+        for idx, leg in enumerate(LEG_NAMES):
+            if leg in self.drivers:
+                d = self.drivers[leg]
+                # The 3 joint angles for this leg are the same we just published.
+                # Find them at positions[3*idx_in_LEG_NAMES : +3].
+                leg_idx = LEG_NAMES.index(leg)
+                q = tuple(positions[3 * leg_idx : 3 * leg_idx + 3])
+                foot_hip = fk_leg(d.link, q)
+                foot_body = d.geom.base_to_hip_xyz + d.geom.R_base_to_hip @ foot_hip
+                self._trails[leg].append(foot_body)
+            trail_msg.markers.append(
+                build_marker(self._trails[leg], frame_id="base_link",
+                             marker_id=idx, stamp=stamp))
+        self._trail_pub.publish(trail_msg)
 
 
 def main(args=None):

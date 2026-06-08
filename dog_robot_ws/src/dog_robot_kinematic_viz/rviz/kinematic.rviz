@@ -25,6 +25,17 @@ Visualization Manager:
       Cell Size: 0.1
       Plane Cell Count: 10
       Color: 160; 160; 160
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: FootTrails
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /foot_trails
+      Namespaces:
+        foot_trail: true
   Global Options:
     Background Color: 48; 48; 48
     Fixed Frame: world
