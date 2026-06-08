@@ -18,7 +18,7 @@ EYE = np.eye(3)
 PHI_APEX = PARAMS.stance_phase_ratio + 0.5 * (1.0 - PARAMS.stance_phase_ratio)
 
 
-def _ft(rest, phi, v_body, params=PARAMS, body_z=0.0, R=EYE):
+def _ft(rest, phi, v_body, body_z=0.0, R=EYE, params=PARAMS):
     """Test helper: call foot_target_in_hip with sensible defaults."""
     return foot_target_in_hip(rest, phi, v_body, body_z, R, params)
 

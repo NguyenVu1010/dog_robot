@@ -23,10 +23,10 @@ import numpy as np
 
 @dataclass(frozen=True)
 class FootTargetParams:
-    stride_per_mps: float = 0.20
-    swing_height: float = 0.03
-    stance_phase_ratio: float = 0.5
-    swing_activation_speed: float = 0.05    # m/s; |v_body| above which lift is full
+    stride_per_mps: float = 0.20          # stride magnitude per m/s of body vel
+    swing_height: float = 0.03            # peak lift above stance plane (m)
+    stance_phase_ratio: float = 0.5       # fraction of cycle spent in stance
+    swing_activation_speed: float = 0.05  # m/s; |v_body| above which lift is full
 
 
 def foot_target_in_hip(rest_in_hip: np.ndarray,
