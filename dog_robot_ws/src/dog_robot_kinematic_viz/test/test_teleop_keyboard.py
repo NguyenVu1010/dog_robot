@@ -1,0 +1,96 @@
+"""TeleopKeyboard key handling: r/f drive vz, space zeros all 4 axes, /cmd_vel
+publishes linear.z. Skipped when rclpy is unavailable.
+"""
+import pytest
+
+rclpy = pytest.importorskip("rclpy")
+
+from geometry_msgs.msg import Twist           # noqa: E402
+
+from dog_robot_kinematic_viz.teleop_keyboard import (   # noqa: E402
+    TeleopKeyboard, LIN_STEP, LIN_MAX,
+)
+
+
+@pytest.fixture
+def rclpy_ctx():
+    rclpy.init()
+    yield
+    rclpy.shutdown()
+
+
+def test_r_key_increments_vz(rclpy_ctx):
+    node = TeleopKeyboard()
+    assert node._vz == 0.0
+    assert node.on_key("r") is True
+    assert node._vz == pytest.approx(LIN_STEP)
+    node.destroy_node()
+
+
+def test_f_key_decrements_vz(rclpy_ctx):
+    node = TeleopKeyboard()
+    assert node.on_key("f") is True
+    assert node._vz == pytest.approx(-LIN_STEP)
+    node.destroy_node()
+
+
+def test_vz_clamps_to_lin_max(rclpy_ctx):
+    node = TeleopKeyboard()
+    # Press r enough times to exceed the +LIN_MAX clamp.
+    for _ in range(int(LIN_MAX / LIN_STEP) + 5):
+        node.on_key("r")
+    assert node._vz == pytest.approx(LIN_MAX)
+    node.destroy_node()
+
+
+def test_vz_clamps_to_neg_lin_max(rclpy_ctx):
+    node = TeleopKeyboard()
+    for _ in range(int(LIN_MAX / LIN_STEP) + 5):
+        node.on_key("f")
+    assert node._vz == pytest.approx(-LIN_MAX)
+    node.destroy_node()
+
+
+def test_space_zeros_all_four_axes(rclpy_ctx):
+    node = TeleopKeyboard()
+    node.on_key("w")   # vx > 0
+    node.on_key("a")   # vy > 0
+    node.on_key("r")   # vz > 0
+    node.on_key("j")   # wz > 0
+    assert node._vx != 0.0
+    assert node._vy != 0.0
+    assert node._vz != 0.0
+    assert node._wz != 0.0
+    node.on_key(" ")
+    assert node._vx == 0.0
+    assert node._vy == 0.0
+    assert node._vz == 0.0
+    assert node._wz == 0.0
+    node.destroy_node()
+
+
+def test_publish_emits_linear_z(rclpy_ctx):
+    node = TeleopKeyboard()
+    received: list[Twist] = []
+
+    listener = rclpy.create_node("teleop_listener")
+    listener.create_subscription(
+        Twist, "/cmd_vel", lambda m: received.append(m), 10)
+
+    node.on_key("r")   # vz = +LIN_STEP, also calls publish()
+    # Spin listener a few times to receive.
+    import time
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 0.3 and not received:
+        rclpy.spin_once(listener, timeout_sec=0.02)
+    assert received, "listener did not receive /cmd_vel"
+    assert received[-1].linear.z == pytest.approx(LIN_STEP)
+
+    listener.destroy_node()
+    node.destroy_node()
+
+
+def test_q_key_returns_false(rclpy_ctx):
+    node = TeleopKeyboard()
+    assert node.on_key("q") is False
+    node.destroy_node()
