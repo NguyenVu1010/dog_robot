@@ -98,7 +98,8 @@ class KinematicNode(Node):
             f"rate={publish_rate} Hz, step_freq={ft_params.stride_per_mps}")
 
     def _on_cmd_vel(self, msg: Twist) -> None:
-        self.commander.on_cmd_vel(msg.linear.x, msg.linear.y, msg.angular.z)
+        self.commander.on_cmd_vel(
+            msg.linear.x, msg.linear.y, msg.linear.z, msg.angular.z)
 
     def _tick(self) -> None:
         now = time.monotonic()

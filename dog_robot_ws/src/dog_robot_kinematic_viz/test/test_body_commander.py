@@ -13,9 +13,12 @@ def test_default_state_is_zero():
 
 def test_on_cmd_vel_updates_state():
     b = BodyCommander()
-    b.on_cmd_vel(0.3, -0.1, 0.05, 0.5)
+    b.on_cmd_vel(0.3, -0.1, 0.03, 0.5)
     assert b.body_vel_xy() == (0.3, -0.1)
     assert b.body_yaw_rate() == 0.5
+    # linear_z is integrated via tick(); 1 s @ 0.03 m/s = 0.03 m (within default clamp).
+    b.tick(1.0)
+    assert b.body_z() == pytest.approx(0.03, abs=1e-9)
 
 
 def test_tick_accumulates_time():
