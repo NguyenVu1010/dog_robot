@@ -30,7 +30,7 @@ is additive and defaults to the current rest pose when `linear.z = 0`.
   height velocity** (m/s). Positive = body rises (feet press downward
   relative to base_link).
 - `BodyCommander` integrates `vz` into a body-height state `body_z`,
-  clamped to `[body_z_min, body_z_max]` (defaults `-0.04 .. +0.04` m,
+  clamped to `[body_z_min, body_z_max]` (defaults `-0.03 .. +0.03` m,
   measured from the CAD rest pose).
 - Each tick, every leg's foot target is shifted by `-body_z` along
   body +Z (the static-TF base_link Z). In each leg's hip frame the shift
@@ -94,8 +94,8 @@ class BodyCommander:
     PHASE_OFFSETS = {"FL": 0.0, "BR": 0.0, "FR": 0.5, "BL": 0.5}
 
     def __init__(self, step_freq: float = 1.5,
-                 body_z_min: float = -0.04,
-                 body_z_max: float = +0.04):
+                 body_z_min: float = -0.03,
+                 body_z_max: float = +0.03):
         self.step_freq = float(step_freq)
         self.body_z_min = float(body_z_min)
         self.body_z_max = float(body_z_max)
@@ -148,8 +148,8 @@ def step(self, body_v_xy, phase, body_z=0.0):
 
 ### `dog_robot_kinematic_viz/kinematic_node.py`
 
-- Declare two new ROS params: `body_z_min` (default `-0.04`),
-  `body_z_max` (default `+0.04`); forward to `BodyCommander(__init__)`.
+- Declare two new ROS params: `body_z_min` (default `-0.03`),
+  `body_z_max` (default `+0.03`); forward to `BodyCommander(__init__)`.
 - `_on_cmd_vel`: pass `msg.linear.z` through:
 
   ```python
@@ -213,20 +213,26 @@ called; the function stays a pure trajectory generator.
 
 ## Range rationale
 
-The current rest foot is well inside the workspace (q=0 across all 3
-joints; L_th + L_sh ≈ 0.244 m total reach, the CAD rest is
-roughly mid-stroke). Allowing `body_z ∈ [-0.04, +0.04] m` (= ±4 cm
-relative to rest):
+Empirical safe envelope at the design-max body velocity `v = 0.10 m/s`:
 
-- At `body_z = +0.04` the body sits higher → feet drive 4 cm further
-  *down* in body Z → thigh+knee extend toward straight. IK roundtrip
-  tests (`test_ik_roundtrip_random_targets_all_legs`) currently sample
-  `q_thigh ∈ (0.2, 1.0)` and `q_knee ∈ (-1.4, -0.2)`; a 4 cm extension
-  keeps every sample inside that envelope by inspection.
-- At `body_z = -0.04` the body sits lower → feet retract 4 cm — again
-  inside the test envelope.
+- At `body_z = +0.04` combined with `v = 0.10`, the knee joint exceeds the
+  URDF limit `+0.5 rad` during the swing peak (measured ~0.54 rad). The
+  failure is geometric: per-leg `R_base_to_hip` rotates the body-Z shift
+  almost entirely into the hip XY plane (because hip-Z aligns with body +X
+  by the REP-103 convention), so the shift extends the foot's hip-XY reach
+  rather than its hip-Z reach. Combined with the swing oscillation in
+  hip-Z, knee saturates.
+- Binary search on the joint-limit boundary places the empirical safe
+  maximum at `~0.036 m`. We pick `0.03 m` as the default clamp (17% margin)
+  so the range is safe for *all* gait velocities up to 0.10 m/s including
+  swing extremes.
+- The static-only safe range (v=0) is wider; if a follow-up adds
+  velocity-dependent clamping, `body_z_max(v=0)` could grow to ~0.04 m.
+  Out of scope for this change.
 
-Range is a parameter so it can be widened later without code changes.
+Range is a parameter (`body_z_min`/`body_z_max` ROS params) so it can be
+widened later without code changes if the gait controller adds velocity
+coupling.
 
 ## Testing strategy
 
@@ -246,18 +252,18 @@ The existing 76 tests stay green (no behavioral change at `body_z = 0`).
 `test_body_commander.py` (extend — file exists):
 - `test_vz_integrates_into_body_z`: `commander.on_cmd_vel(0,0,0.02,0)`,
   `tick(0.1)` → `body_z() ≈ 0.002`.
-- `test_body_z_clamps_at_max`: push `vz=0.1` for 1 s → `body_z() == +0.04`.
-- `test_body_z_clamps_at_min`: push `vz=-0.1` for 1 s → `body_z() == -0.04`.
+- `test_body_z_clamps_at_max`: push `vz=0.1` for 1 s → `body_z() == +0.03`.
+- `test_body_z_clamps_at_min`: push `vz=-0.1` for 1 s → `body_z() == -0.03`.
 - `test_space_zeros_vz`: after non-zero vz, calling
   `on_cmd_vel(0,0,0,0)` halts integration on subsequent ticks.
 
 `test_leg_driver.py` (extend):
 - `test_zero_velocity_stance_with_body_z_shifts_foot_in_body_z`: for each
-  leg, `d.step((0,0), 0.0, body_z=+0.04)` → `fk_leg(d.link, q)` in body
-  frame equals `rest_body + [0,0,-0.04]` (within IK tolerance).
+  leg, `d.step((0,0), 0.0, body_z=+0.03)` → `fk_leg(d.link, q)` in body
+  frame equals `rest_body + [0,0,-0.03]` (within IK tolerance).
 - `test_body_z_extreme_keeps_joints_in_limits`: for each leg, the full
   forward-velocity cycle (30 phase samples, `v=0.10 m/s`) at
-  `body_z = ±0.04` stays within `JOINT_LIMITS`.
+  `body_z = ±0.03` stays within `JOINT_LIMITS`.
 
 `test_kinematic_node_smoke.py` (extend):
 - `test_linear_z_drives_body_height_state`: spin up the node, publish a
@@ -285,6 +291,8 @@ The existing 76 tests stay green (no behavioral change at `body_z = 0`).
   and matches the chosen convention).
 - Tuning `swing_height` as a function of `body_z` to keep ground
   clearance constant when crouched.
+- Velocity-coupled clamp (e.g. tighter `body_z_max` when |v| is high). The
+  current fixed clamp is conservative for the worst case (v at design max).
 
 ## Files touched
 

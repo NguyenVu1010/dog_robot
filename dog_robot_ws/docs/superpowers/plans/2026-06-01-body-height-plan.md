@@ -104,19 +104,19 @@ def test_vz_integrates_into_body_z():
 
 
 def test_body_z_clamps_at_max():
-    b = BodyCommander()  # default body_z_max = +0.04
+    b = BodyCommander()  # default body_z_max = +0.03
     b.on_cmd_vel(0.0, 0.0, 0.10, 0.0)
     for _ in range(100):
-        b.tick(0.01)   # total commanded delta = 0.10 * 1.0 = 0.10 m
-    assert b.body_z() == pytest.approx(0.04, abs=1e-9)
+        b.tick(0.01)   # vz=0.10 m/s * 1.0 s = 0.10 m commanded, well past clamp
+    assert b.body_z() == pytest.approx(0.03, abs=1e-9)
 
 
 def test_body_z_clamps_at_min():
-    b = BodyCommander()  # default body_z_min = -0.04
+    b = BodyCommander()  # default body_z_min = -0.03
     b.on_cmd_vel(0.0, 0.0, -0.10, 0.0)
     for _ in range(100):
         b.tick(0.01)
-    assert b.body_z() == pytest.approx(-0.04, abs=1e-9)
+    assert b.body_z() == pytest.approx(-0.03, abs=1e-9)
 
 
 def test_space_zeros_vz_halts_integration():
@@ -177,8 +177,8 @@ class BodyCommander:
     PHASE_OFFSETS = {"FL": 0.0, "BR": 0.0, "FR": 0.5, "BL": 0.5}
 
     def __init__(self, step_freq: float = 1.5,
-                 body_z_min: float = -0.04,
-                 body_z_max: float = +0.04):
+                 body_z_min: float = -0.03,
+                 body_z_max: float = +0.03):
         self.step_freq = float(step_freq)
         self.body_z_min = float(body_z_min)
         self.body_z_max = float(body_z_max)
@@ -261,7 +261,7 @@ def test_zero_velocity_stance_with_body_z_shifts_foot_in_body_z(name):
     # foot must be a distance `body_z` LOWER in body Z than at rest.
     drivers = _make_drivers()
     d = drivers[name]
-    bz = 0.04
+    bz = 0.03
     q = d.step((0.0, 0.0), 0.0, body_z=bz)
     # FK in hip frame, rotate to body frame.
     foot_hip = fk_leg(d.link, q)
@@ -277,19 +277,19 @@ def test_zero_velocity_stance_with_body_z_shifts_foot_in_body_z(name):
 def test_zero_velocity_stance_with_negative_body_z_shifts_foot_up(name):
     drivers = _make_drivers()
     d = drivers[name]
-    bz = -0.04
+    bz = -0.03
     q = d.step((0.0, 0.0), 0.0, body_z=bz)
     foot_hip = fk_leg(d.link, q)
     foot_body = d.geom.R_base_to_hip @ foot_hip
     rest_body = d.geom.R_base_to_hip @ d.rest_in_hip
-    expected_body = rest_body + np.array([0.0, 0.0, -bz])  # = +0.04
+    expected_body = rest_body + np.array([0.0, 0.0, -bz])  # = +0.03
     np.testing.assert_allclose(
         foot_body, expected_body, atol=1e-6,
         err_msg=f"{name}: foot_body={foot_body} expected={expected_body}")
 
 
 @pytest.mark.parametrize("name", LEG_NAMES)
-@pytest.mark.parametrize("bz", [+0.04, -0.04])
+@pytest.mark.parametrize("bz", [+0.03, -0.03])
 def test_body_z_extreme_keeps_joints_in_limits_full_cycle(name, bz):
     # Full forward-velocity cycle at the body_z clamp extremes must stay
     # within hardware joint limits.
@@ -318,8 +318,8 @@ def test_rest_in_hip_not_mutated_by_body_z_step(name):
     drivers = _make_drivers()
     d = drivers[name]
     rest_before = d.rest_in_hip.copy()
-    d.step((0.0, 0.0), 0.0, body_z=0.04)
-    d.step((0.0, 0.0), 0.0, body_z=-0.04)
+    d.step((0.0, 0.0), 0.0, body_z=0.03)
+    d.step((0.0, 0.0), 0.0, body_z=-0.03)
     np.testing.assert_array_equal(d.rest_in_hip, rest_before)
 ```
 
@@ -479,8 +479,8 @@ Apply three edits to `dog_robot_ws/src/dog_robot_kinematic_viz/dog_robot_kinemat
 (a) After the existing parameter declarations (after the `self.declare_parameter("stance_phase_ratio", 0.5)` line), add the two new range params and read them:
 
 ```python
-        self.declare_parameter("body_z_min", -0.04)
-        self.declare_parameter("body_z_max", +0.04)
+        self.declare_parameter("body_z_min", -0.03)
+        self.declare_parameter("body_z_max", +0.03)
 ```
 
 (b) Pass them to `BodyCommander.__init__`. Replace the existing line:
@@ -887,7 +887,7 @@ ros2 launch dog_robot_kinematic_viz kinematic_teleop.launch.py
 
 Test plan in the teleop terminal:
 - Press `r` ~5 times → RViz: thigh/knee joints should extend, foot stays planted (body appears to "rise" relative to ground). Log shows `linear=(...,...,+0.10)`.
-- Press `f` ~10 times → RViz: thigh/knee retract; foot stays planted; body appears to lower. Log eventually clamps at `linear=(...,...,-0.20)`, but `body_z` itself stops at `body_z_min = -0.04` (visible as joints saturating, not the published value).
+- Press `f` ~10 times → RViz: thigh/knee retract; foot stays planted; body appears to lower. Log eventually clamps at `linear=(...,...,-0.20)`, but `body_z` itself stops at `body_z_min = -0.03` (visible as joints saturating, not the published value).
 - Press `space` → all axes zero; legs return to rest pose.
 - Press `w` then `r` → robot walks forward AND body height changes simultaneously without IK failures (no orphan log warnings about unreachable targets).
 - Press `q` to quit.
@@ -923,7 +923,7 @@ git commit -m "docs(plan): tick off body-height implementation tasks"
 ## Self-review (do this before handing off)
 
 1. **Spec coverage:**
-   - User-facing contract (linear.z → body_z velocity, ±0.04 clamp, space zeros all four) → Tasks 1, 3, 4.
+   - User-facing contract (linear.z → body_z velocity, ±0.03 clamp, space zeros all four) → Tasks 1, 3, 4.
    - `BodyCommander` 4-arg `on_cmd_vel`, `body_z()`, clamp at source → Task 1.
    - `LegDriver.step(..., body_z=0.0)` per-call shift, rest not mutated → Task 2.
    - `kinematic_node` declares `body_z_min`/`body_z_max`, forwards `linear.z`, passes `body_z` to drivers → Task 3.
@@ -937,7 +937,7 @@ git commit -m "docs(plan): tick off body-height implementation tasks"
    - `LegDriver.step(body_v_xy, phase, body_z=0.0)` matches in Task 2 impl, Task 2 tests, and Task 3 caller (`bz` positional).
    - `commander.body_z()` getter used in Task 3 matches Task 1 impl.
 
-3. **Range / clamp consistency:** Defaults `±0.04` appear in spec, `BodyCommander.__init__` defaults, `kinematic_node.declare_parameter` defaults, and test fixtures — all aligned.
+3. **Range / clamp consistency:** Defaults `±0.03` appear in spec, `BodyCommander.__init__` defaults, `kinematic_node.declare_parameter` defaults, and test fixtures — all aligned.
 
 4. **No placeholders:** All test bodies and all impl bodies are spelled out in full. No "similar to above" references.
 

@@ -163,7 +163,7 @@ def test_zero_velocity_stance_with_body_z_shifts_foot_in_body_z(name):
     # foot must be a distance `body_z` LOWER in body Z than at rest.
     drivers = _make_drivers()
     d = drivers[name]
-    bz = 0.04
+    bz = 0.03
     q = d.step((0.0, 0.0), 0.0, body_z=bz)
     # FK in hip frame, rotate to body frame.
     foot_hip = fk_leg(d.link, q)
@@ -179,19 +179,19 @@ def test_zero_velocity_stance_with_body_z_shifts_foot_in_body_z(name):
 def test_zero_velocity_stance_with_negative_body_z_shifts_foot_up(name):
     drivers = _make_drivers()
     d = drivers[name]
-    bz = -0.04
+    bz = -0.03
     q = d.step((0.0, 0.0), 0.0, body_z=bz)
     foot_hip = fk_leg(d.link, q)
     foot_body = d.geom.R_base_to_hip @ foot_hip
     rest_body = d.geom.R_base_to_hip @ d.rest_in_hip
-    expected_body = rest_body + np.array([0.0, 0.0, -bz])  # = +0.04
+    expected_body = rest_body + np.array([0.0, 0.0, -bz])  # = +0.03
     np.testing.assert_allclose(
         foot_body, expected_body, atol=1e-6,
         err_msg=f"{name}: foot_body={foot_body} expected={expected_body}")
 
 
 @pytest.mark.parametrize("name", LEG_NAMES)
-@pytest.mark.parametrize("bz", [+0.04, -0.04])
+@pytest.mark.parametrize("bz", [+0.03, -0.03])
 def test_body_z_extreme_keeps_joints_in_limits_full_cycle(name, bz):
     # Full forward-velocity cycle at the body_z clamp extremes must stay
     # within hardware joint limits.
@@ -220,6 +220,6 @@ def test_rest_in_hip_not_mutated_by_body_z_step(name):
     drivers = _make_drivers()
     d = drivers[name]
     rest_before = d.rest_in_hip.copy()
-    d.step((0.0, 0.0), 0.0, body_z=0.04)
-    d.step((0.0, 0.0), 0.0, body_z=-0.04)
+    d.step((0.0, 0.0), 0.0, body_z=0.03)
+    d.step((0.0, 0.0), 0.0, body_z=-0.03)
     np.testing.assert_array_equal(d.rest_in_hip, rest_before)

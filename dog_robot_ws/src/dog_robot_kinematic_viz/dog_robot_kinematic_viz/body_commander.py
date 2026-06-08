@@ -18,8 +18,8 @@ class BodyCommander:
     PHASE_OFFSETS = {"FL": 0.0, "BR": 0.0, "FR": 0.5, "BL": 0.5}
 
     def __init__(self, step_freq: float = 1.5,
-                 body_z_min: float = -0.04,
-                 body_z_max: float = +0.04):
+                 body_z_min: float = -0.03,
+                 body_z_max: float = +0.03):
         self.step_freq = float(step_freq)
         self.body_z_min = float(body_z_min)
         self.body_z_max = float(body_z_max)

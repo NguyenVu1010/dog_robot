@@ -81,19 +81,19 @@ def test_vz_integrates_into_body_z():
 
 
 def test_body_z_clamps_at_max():
-    b = BodyCommander()  # default body_z_max = +0.04
+    b = BodyCommander()  # default body_z_max = +0.03
     b.on_cmd_vel(0.0, 0.0, 0.10, 0.0)
     for _ in range(100):
-        b.tick(0.01)   # total commanded delta = 0.10 * 1.0 = 0.10 m
-    assert b.body_z() == pytest.approx(0.04, abs=1e-9)
+        b.tick(0.01)   # vz=0.10 m/s * 1.0 s = 0.10 m commanded, well past clamp
+    assert b.body_z() == pytest.approx(0.03, abs=1e-9)
 
 
 def test_body_z_clamps_at_min():
-    b = BodyCommander()  # default body_z_min = -0.04
+    b = BodyCommander()  # default body_z_min = -0.03
     b.on_cmd_vel(0.0, 0.0, -0.10, 0.0)
     for _ in range(100):
         b.tick(0.01)
-    assert b.body_z() == pytest.approx(-0.04, abs=1e-9)
+    assert b.body_z() == pytest.approx(-0.03, abs=1e-9)
 
 
 def test_space_zeros_vz_halts_integration():
