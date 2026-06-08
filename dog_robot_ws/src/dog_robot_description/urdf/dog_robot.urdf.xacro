@@ -29,7 +29,7 @@
        every URDF visual <origin> is identity. -->
 
   <xacro:leg prefix="FL"
-             base_to_hip_xyz="0.07480000 0.04000000 0.03510000"
+             base_to_hip_xyz="0.12440000 0.04000000 0.03510000"
              base_to_hip_rpy="1.57079633 0.47898407 1.57079633"
              hip_to_thigh_xyz="0.02857903 -0.00000000 -0.02520000"
              hip_to_thigh_rpy="-1.57079633 0.86153654 -1.09167192"
@@ -39,7 +39,7 @@
              knee_to_foot_rpy="1.57079633 -0.00000000 -0.51962570"/>
 
   <xacro:leg prefix="FR"
-             base_to_hip_xyz="0.07480000 -0.04000000 0.03510000"
+             base_to_hip_xyz="0.12440000 -0.04000000 0.03510000"
              base_to_hip_rpy="-1.57079633 0.45269343 -1.57079633"
              hip_to_thigh_xyz="0.02857866 0.00000000 -0.02520000"
              hip_to_thigh_rpy="-1.57079633 0.86322489 1.11810290"

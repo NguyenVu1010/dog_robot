@@ -2,7 +2,7 @@
 per_leg:
   FL:
     base_to_hip_xyz:
-    - 0.0748
+    - 0.1244
     - 0.04
     - 0.0351
     base_to_hip_rpy:
@@ -11,7 +11,7 @@ per_leg:
     - 1.5707963267948966
   FR:
     base_to_hip_xyz:
-    - 0.0748
+    - 0.1244
     - -0.04
     - 0.0351
     base_to_hip_rpy:
