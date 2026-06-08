@@ -49,6 +49,8 @@ class KinematicNode(Node):
         self.declare_parameter("stride_per_mps", 0.20)
         self.declare_parameter("swing_height", 0.03)
         self.declare_parameter("stance_phase_ratio", 0.5)
+        self.declare_parameter("body_z_min", -0.03)
+        self.declare_parameter("body_z_max", +0.03)
 
         publish_rate = float(self.get_parameter("publish_rate").value)
         active = list(self.get_parameter("active_legs").value)
@@ -77,7 +79,9 @@ class KinematicNode(Node):
         # ----- runtime state -----
         geoms = load_leg_geoms(joints_yaml)
         self.commander = BodyCommander(
-            step_freq=float(self.get_parameter("step_freq").value))
+            step_freq=float(self.get_parameter("step_freq").value),
+            body_z_min=float(self.get_parameter("body_z_min").value),
+            body_z_max=float(self.get_parameter("body_z_max").value))
         self.drivers: Dict[str, LegDriver] = {
             name: LegDriver(geoms[name],
                             load_link_params(link_yaml, name),
@@ -108,10 +112,12 @@ class KinematicNode(Node):
         self.commander.tick(dt)
 
         v_xy = self.commander.body_vel_xy()
+        bz = self.commander.body_z()
         positions: List[float] = []
         for leg in LEG_NAMES:
             if leg in self.drivers:
-                q = self.drivers[leg].step(v_xy, self.commander.phase(leg))
+                q = self.drivers[leg].step(
+                    v_xy, self.commander.phase(leg), bz)
             else:
                 q = self._idle
             positions.extend(float(x) for x in q)

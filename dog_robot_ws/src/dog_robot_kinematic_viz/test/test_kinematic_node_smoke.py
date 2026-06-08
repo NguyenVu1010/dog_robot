@@ -130,3 +130,55 @@ def test_idle_legs_publish_zero_joints(rclpy_ctx):
 
     node.destroy_node()
     listener.destroy_node()
+
+
+def test_linear_z_drives_body_height_state(rclpy_ctx):
+    # Publishing linear.z > 0 must move feet DOWN in body Z relative to the
+    # zero-input baseline (because body_z > 0 means body rises, feet press
+    # further down).  We assert the joint snapshot diverges from baseline.
+    node = KinematicNode(parameter_overrides=_overrides())
+
+    listener = rclpy.create_node("body_z_listener")
+    received: list[JointState] = []
+    listener.create_subscription(
+        JointState, "/joint_states", lambda m: received.append(m), 10)
+
+    publisher = rclpy.create_node("body_z_publisher")
+    pub = publisher.create_publisher(Twist, "/cmd_vel", 10)
+
+    ex = SingleThreadedExecutor()
+    ex.add_node(node)
+    ex.add_node(listener)
+    ex.add_node(publisher)
+
+    # Baseline: spin at zero input, hold a stance-phase snapshot.
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 0.4:
+        ex.spin_once(timeout_sec=0.02)
+    assert received, "no /joint_states received during warm-up"
+    snapshot_pre = list(received[-1].position)
+
+    # Drive body up at 0.04 m/s for ~0.5 s -> body_z ~ +0.02 (well below the
+    # +0.03 default clamp).
+    twist = Twist()
+    twist.linear.z = 0.04
+    pub.publish(twist)
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 0.6:
+        ex.spin_once(timeout_sec=0.02)
+    snapshot_post = list(received[-1].position)
+
+    delta = max(abs(a - b) for a, b in zip(snapshot_pre, snapshot_post))
+    assert delta > 1e-3, "joints did not respond to /cmd_vel.linear.z"
+
+    node.destroy_node()
+    listener.destroy_node()
+    publisher.destroy_node()
+
+
+def test_body_z_range_params_passed_to_commander(rclpy_ctx):
+    node = KinematicNode(parameter_overrides=_overrides(
+        body_z_min=-0.10, body_z_max=+0.10))
+    assert node.commander.body_z_min == pytest.approx(-0.10)
+    assert node.commander.body_z_max == pytest.approx(+0.10)
+    node.destroy_node()
