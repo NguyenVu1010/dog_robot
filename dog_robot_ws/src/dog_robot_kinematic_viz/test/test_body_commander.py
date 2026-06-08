@@ -13,7 +13,7 @@ def test_default_state_is_zero():
 
 def test_on_cmd_vel_updates_state():
     b = BodyCommander()
-    b.on_cmd_vel(0.3, -0.1, 0.5)
+    b.on_cmd_vel(0.3, -0.1, 0.05, 0.5)
     assert b.body_vel_xy() == (0.3, -0.1)
     assert b.body_yaw_rate() == 0.5
 
@@ -61,3 +61,52 @@ def test_unknown_leg_raises():
     b = BodyCommander()
     with pytest.raises(KeyError):
         b.phase("XX")
+
+
+def test_default_body_z_is_zero():
+    b = BodyCommander()
+    assert b.body_z() == 0.0
+
+
+def test_vz_integrates_into_body_z():
+    b = BodyCommander()
+    b.on_cmd_vel(0.0, 0.0, 0.02, 0.0)
+    b.tick(0.1)
+    assert b.body_z() == pytest.approx(0.002, abs=1e-9)
+    b.tick(0.1)
+    assert b.body_z() == pytest.approx(0.004, abs=1e-9)
+
+
+def test_body_z_clamps_at_max():
+    b = BodyCommander()  # default body_z_max = +0.04
+    b.on_cmd_vel(0.0, 0.0, 0.10, 0.0)
+    for _ in range(100):
+        b.tick(0.01)   # total commanded delta = 0.10 * 1.0 = 0.10 m
+    assert b.body_z() == pytest.approx(0.04, abs=1e-9)
+
+
+def test_body_z_clamps_at_min():
+    b = BodyCommander()  # default body_z_min = -0.04
+    b.on_cmd_vel(0.0, 0.0, -0.10, 0.0)
+    for _ in range(100):
+        b.tick(0.01)
+    assert b.body_z() == pytest.approx(-0.04, abs=1e-9)
+
+
+def test_space_zeros_vz_halts_integration():
+    b = BodyCommander()
+    b.on_cmd_vel(0.0, 0.0, 0.02, 0.0)
+    b.tick(0.5)
+    z_after_drive = b.body_z()
+    assert z_after_drive == pytest.approx(0.01, abs=1e-9)
+    b.on_cmd_vel(0.0, 0.0, 0.0, 0.0)   # space
+    b.tick(1.0)
+    assert b.body_z() == pytest.approx(z_after_drive, abs=1e-9)
+
+
+def test_body_z_min_max_params_respected():
+    b = BodyCommander(body_z_min=-0.10, body_z_max=+0.10)
+    b.on_cmd_vel(0.0, 0.0, 1.0, 0.0)
+    for _ in range(50):
+        b.tick(0.01)
+    assert b.body_z() == pytest.approx(0.10, abs=1e-9)
