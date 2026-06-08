@@ -136,6 +136,7 @@ def test_linear_z_drives_body_height_state(rclpy_ctx):
     # Publishing linear.z > 0 must move feet DOWN in body Z relative to the
     # zero-input baseline (because body_z > 0 means body rises, feet press
     # further down).  We assert the joint snapshot diverges from baseline.
+    # step_freq=0.0 freezes the gait clock so only body_z can move joints.
     node = KinematicNode(parameter_overrides=_overrides(step_freq=0.0))
 
     listener = rclpy.create_node("body_z_listener")
@@ -159,12 +160,12 @@ def test_linear_z_drives_body_height_state(rclpy_ctx):
     snapshot_pre = list(received[-1].position)
 
     # Drive body up at 0.04 m/s for ~0.6 s -> body_z ~ +0.024 (below the
-    # +0.03 default clamp).
+    # +0.03 default clamp). Republish each tick to defeat DDS pre-match drops.
     twist = Twist()
     twist.linear.z = 0.04
-    pub.publish(twist)
     t0 = time.monotonic()
     while time.monotonic() - t0 < 0.6:
+        pub.publish(twist)
         ex.spin_once(timeout_sec=0.02)
     snapshot_post = list(received[-1].position)
 
