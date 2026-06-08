@@ -8,6 +8,10 @@ the class itself.
 The foot oscillates around the leg's CAD rest pose `fk_leg(link, (0,0,0))`
 so joint angles stay near zero (well inside limits) and the IK never
 hits the hip-axis singularity that ik_leg raises on.
+
+Architecture: foot_target_in_hip receives body-frame velocity and rotates
+it into the hip frame internally. LegDriver is a thin wrapper: it passes
+body velocity + R_base_to_hip directly to foot_target_in_hip.
 """
 from __future__ import annotations
 from typing import Tuple
@@ -36,31 +40,19 @@ class LegDriver:
     def step(self, body_v_xy: Tuple[float, float],
              phase: float,
              body_z: float = 0.0) -> Tuple[float, float, float]:
-        # Rotate the body-frame XY velocity into this leg's hip frame.
-        # R_base_to_hip maps a hip-frame vector to the body frame, so the
-        # inverse (transpose, since R is orthonormal) takes body -> hip.
-        v3 = np.array([float(body_v_xy[0]), float(body_v_xy[1]), 0.0])
-        v_hip = self.geom.R_base_to_hip.T @ v3
-
-        # body_z > 0 means body rises, so each foot must shift -body_z in
-        # body Z. Rotate that body-frame shift into the hip frame and add
-        # to the CAD rest pose for this call only (rest_in_hip itself is
-        # never mutated — the clamp lives in BodyCommander).
-        bz_shift_body = np.array([0.0, 0.0, -float(body_z)])
-        bz_shift_hip = self.geom.R_base_to_hip.T @ bz_shift_body
-        rest = self.rest_in_hip + bz_shift_hip
-
         target = foot_target_in_hip(
-            rest, phase, (v_hip[0], v_hip[1]), self.ft)
-
+            self.rest_in_hip,
+            phase,
+            body_v_xy,
+            body_z,
+            self.geom.R_base_to_hip,
+            self.ft,
+        )
         try:
             q = ik_leg(self.link, target, knee_branch=+1)
         except ValueError:
-            # Unreachable / singular: hold last good joints rather than crash
-            # the node. body_z clamp keeps us well inside the workspace under
-            # normal operation.
+            # Unreachable / singular: hold last good joints rather than crash.
             return self._last_joints
-
         self._last_joints = q
         return q
 

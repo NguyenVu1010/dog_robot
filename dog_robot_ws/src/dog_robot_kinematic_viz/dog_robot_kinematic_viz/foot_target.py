@@ -1,21 +1,19 @@
-"""Per-leg foot trajectory in hip frame, anchored at the leg's CAD rest pose.
+"""Per-leg foot trajectory, computed in body frame and rotated to hip frame.
 
-Design choice: each leg's "neutral" foot position is `fk_leg(p, 0)` — the
-foot location when all 3 joints are zero. The gait oscillates around that
-neutral, so q stays near zero (well inside joint limits) and the IK never
-sees the foot on the hip rotation axis (which raises in `kinematics_link.ik_leg`).
-The body XY velocity is rotated into the leg's hip frame (by the caller)
-and scaled to a per-cycle stride vector.
+The gait stride and lift are physically defined in BODY frame:
+- Stride: horizontal displacement in body +X/+Y plane, proportional to body velocity.
+- Lift: vertical displacement in body +Z, only during swing phase.
+- body_z translation: the body raises in body +Z; feet drop -body_z in body to compensate.
+
+After computing the full body-frame displacement, rotate into the leg's hip
+frame (using R_base_to_hip.T) and add to rest_in_hip for ik_leg.
 
 Phase convention (phi in [0, 1)):
     0  ..  stance_phase_ratio   stance: foot drags backwards along stride
-    stance_phase_ratio .. 1     swing : foot returns + lifts (sin arch)
-Continuity is enforced at phi = stance_phase_ratio and at phi = 1 -> 0:
-    foot_target is C0 continuous across both seams.
-
-Swing lift scaling: swing lift scales linearly with |v_hip_xy| from 0 at v=0
-    to full swing_height at |v| >= swing_activation_speed. This ensures legs
-    hold still when /cmd_vel is zero.
+    stance_phase_ratio .. 1     swing : foot returns + lifts (sin arch),
+                                lift scales linearly with |v_body_xy| up to
+                                swing_activation_speed (then saturates).
+Continuity is C0 across the stance/swing seam and the cycle wrap.
 """
 from __future__ import annotations
 from dataclasses import dataclass
@@ -25,44 +23,54 @@ import numpy as np
 
 @dataclass(frozen=True)
 class FootTargetParams:
-    stride_per_mps: float = 0.20          # stride magnitude per m/s of body vel
-    swing_height: float = 0.03            # peak lift above stance plane (m)
-    stance_phase_ratio: float = 0.5       # fraction of cycle spent in stance
-    swing_activation_speed: float = 0.05  # m/s; |v| above which lift is full
+    stride_per_mps: float = 0.20
+    swing_height: float = 0.03
+    stance_phase_ratio: float = 0.5
+    swing_activation_speed: float = 0.05    # m/s; |v_body| above which lift is full
 
 
 def foot_target_in_hip(rest_in_hip: np.ndarray,
                        phase: float,
-                       v_hip_xy: tuple[float, float],
+                       v_body_xy: tuple[float, float],
+                       body_z: float,
+                       R_base_to_hip: np.ndarray,
                        params: FootTargetParams) -> np.ndarray:
-    """Return foot target (x, y, z) in the leg's hip frame at the given phase.
+    """Return foot target in hip frame.
 
-    rest_in_hip: fk_leg(p, (0,0,0)) for this leg; the foot oscillates around
-        this point so joint angles stay near zero.
-    phase: in [0, 1). Wraps automatically (uses phase % 1.0).
-    v_hip_xy: body XY velocity expressed in the hip frame (caller rotates).
+    rest_in_hip: fk_leg(p, (0,0,0)) for this leg, in hip frame.
+    phase: in [0, 1). Wraps automatically.
+    v_body_xy: body-frame XY velocity (m/s). Forward = (+vx, 0).
+    body_z: body-frame Z translation (m), clamped upstream in BodyCommander.
+    R_base_to_hip: hip->body rotation matrix for this leg (3x3, orthonormal).
+    params: gait shape.
     """
     phi = float(phase) % 1.0
     r = params.stance_phase_ratio
-    sx = params.stride_per_mps * float(v_hip_xy[0])
-    sy = params.stride_per_mps * float(v_hip_xy[1])
-    v_mag = float(np.hypot(v_hip_xy[0], v_hip_xy[1]))
-    s = params.swing_activation_speed
-    swing_scale = 1.0 if s <= 0.0 else min(1.0, v_mag / s)
+
+    vx_body = float(v_body_xy[0])
+    vy_body = float(v_body_xy[1])
+    sx_body = params.stride_per_mps * vx_body
+    sy_body = params.stride_per_mps * vy_body
 
     if phi < r:
-        # Stance: linear forward -> backward along stride (scale +0.5 -> -0.5).
         u = phi / r
         scale = 0.5 - u
-        z_lift = 0.0
+        z_lift_body = 0.0
     else:
-        # Swing: linear backward -> forward (scale -0.5 -> +0.5) with sin lift.
         u = (phi - r) / (1.0 - r)
         scale = -0.5 + u
-        z_lift = params.swing_height * np.sin(np.pi * u) * swing_scale
+        v_mag = float(np.hypot(vx_body, vy_body))
+        s = params.swing_activation_speed
+        swing_scale = 1.0 if s <= 0.0 else min(1.0, v_mag / s)
+        z_lift_body = params.swing_height * np.sin(np.pi * u) * swing_scale
 
-    return np.array([
-        rest_in_hip[0] + sx * scale,
-        rest_in_hip[1] + sy * scale,
-        rest_in_hip[2] + z_lift,
+    # Full body-frame displacement from rest:
+    #   stride (XY) + swing lift (Z) + body_z compensation (foot drops -body_z).
+    disp_body = np.array([
+        sx_body * scale,
+        sy_body * scale,
+        z_lift_body - float(body_z),
     ])
+
+    # Rotate body-frame displacement into hip frame and add to rest.
+    return rest_in_hip + R_base_to_hip.T @ disp_body

@@ -105,9 +105,9 @@ def test_fk_of_step_matches_commanded_target_on_forward_velocity(name):
         v = (0.10, 0.0)
         q = d.step(v, float(phi))
         foot_fk = fk_leg(d.link, q)
-        v_hip = d.geom.R_base_to_hip.T @ np.array([v[0], v[1], 0.0])
         expected = foot_target_in_hip(
-            d.rest_in_hip, float(phi), (v_hip[0], v_hip[1]), PARAMS)
+            d.rest_in_hip, float(phi), v, 0.0,
+            d.geom.R_base_to_hip, PARAMS)
         np.testing.assert_allclose(
             foot_fk, expected, atol=1e-6,
             err_msg=f"{name} phi={phi:.3f}: FK={foot_fk} expected={expected}")
@@ -223,3 +223,40 @@ def test_rest_in_hip_not_mutated_by_body_z_step(name):
     d.step((0.0, 0.0), 0.0, body_z=0.03)
     d.step((0.0, 0.0), 0.0, body_z=-0.03)
     np.testing.assert_array_equal(d.rest_in_hip, rest_before)
+
+
+@pytest.mark.parametrize("name", LEG_NAMES)
+def test_forward_velocity_produces_body_x_stride(name):
+    # Bug fix verification: at v=(+0.10, 0) body velocity, foot must oscillate
+    # along body +X across a cycle (previously this was silently zero because
+    # body +X rotated entirely into hip-Z and got dropped by foot_target).
+    drivers = _make_drivers()
+    d = drivers[name]
+    foot_body_at_phase = {}
+    for phi in (0.0, 0.25, 0.499, 0.75):
+        q = d.step((0.10, 0.0), float(phi))
+        foot_hip = fk_leg(d.link, q)
+        foot_body = d.geom.R_base_to_hip @ foot_hip
+        foot_body_at_phase[phi] = foot_body
+    # Stance start vs stance end: foot should drag backward in body X.
+    bx_start = foot_body_at_phase[0.0][0]
+    bx_end = foot_body_at_phase[0.499][0]
+    drag_distance = bx_start - bx_end
+    # Expected drag = stride_per_mps * v * (0.5 - (-0.5)) = 0.20 * 0.10 * 1.0 = 0.02.
+    # Tolerate generous slop because IK might lose precision over the swing apex.
+    assert drag_distance == pytest.approx(0.02, abs=1e-3), (
+        f"{name}: body-X drag during stance = {drag_distance:+.4f} "
+        f"(expected ~+0.02 for forward velocity)")
+
+
+@pytest.mark.parametrize("name", LEG_NAMES)
+def test_backward_velocity_produces_negative_body_x_stride(name):
+    drivers = _make_drivers()
+    d = drivers[name]
+    q_start = d.step((-0.10, 0.0), 0.0)
+    q_end = d.step((-0.10, 0.0), 0.499)
+    bx_start = (d.geom.R_base_to_hip @ fk_leg(d.link, q_start))[0]
+    bx_end = (d.geom.R_base_to_hip @ fk_leg(d.link, q_end))[0]
+    drag = bx_start - bx_end
+    assert drag == pytest.approx(-0.02, abs=1e-3), (
+        f"{name}: body-X drag = {drag:+.4f} (expected ~-0.02 for backward velocity)")
