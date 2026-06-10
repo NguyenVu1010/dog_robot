@@ -19,7 +19,7 @@ leg reach) LegDriver returns the last good joints and logs a WARN exactly
 once per saturation event (cleared on next success).
 """
 from __future__ import annotations
-from typing import Optional, Tuple
+from typing import Tuple
 
 import numpy as np
 
