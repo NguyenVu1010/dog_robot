@@ -1,4 +1,4 @@
-"""Minimal WASD+JL+RF teleop publisher for /cmd_vel.
+"""Minimal WASD+JL+RF+IK teleop publisher for /cmd_vel.
 
 Self-contained — no dog_robot_control / external teleop_twist_keyboard
 dependency. Reads single keypresses from a TTY in raw mode; designed to be
@@ -9,8 +9,9 @@ Keys:
     w / s  : linear.x  +/-   (forward / back)
     a / d  : linear.y  +/-   (strafe left / right)
     r / f  : linear.z  +/-   (body up / down — height velocity)
+    i / k  : angular.y +/-   (rear up / down — rear-height velocity)
     j / l  : angular.z +/-   (yaw left / right)
-    space  : zero all four axes
+    space  : zero all five axes
     q      : quit
 """
 from __future__ import annotations
@@ -35,6 +36,7 @@ HELP = """
     w/s  forward / back     (linear.x)
     a/d  left / right       (linear.y)
     r/f  body up / down     (linear.z — height velocity)
+    i/k  rear up / down     (angular.y — rear-height velocity)
     j/l  yaw left / right   (angular.z)
     space  zero all
     q      quit
@@ -53,6 +55,7 @@ class TeleopKeyboard(Node):
         self._vx = 0.0
         self._vy = 0.0
         self._vz = 0.0
+        self._wy = 0.0
         self._wz = 0.0
 
     def publish(self):
@@ -60,6 +63,7 @@ class TeleopKeyboard(Node):
         msg.linear.x = self._vx
         msg.linear.y = self._vy
         msg.linear.z = self._vz
+        msg.angular.y = self._wy
         msg.angular.z = self._wz
         self._pub.publish(msg)
 
@@ -77,12 +81,16 @@ class TeleopKeyboard(Node):
             self._vz = _clamp(self._vz + LIN_STEP, -LIN_MAX, LIN_MAX)
         elif key == "f":
             self._vz = _clamp(self._vz - LIN_STEP, -LIN_MAX, LIN_MAX)
+        elif key == "i":
+            self._wy = _clamp(self._wy + LIN_STEP, -LIN_MAX, LIN_MAX)
+        elif key == "k":
+            self._wy = _clamp(self._wy - LIN_STEP, -LIN_MAX, LIN_MAX)
         elif key == "j":
             self._wz = _clamp(self._wz + ANG_STEP, -ANG_MAX, ANG_MAX)
         elif key == "l":
             self._wz = _clamp(self._wz - ANG_STEP, -ANG_MAX, ANG_MAX)
         elif key == " ":
-            self._vx = self._vy = self._vz = self._wz = 0.0
+            self._vx = self._vy = self._vz = self._wy = self._wz = 0.0
         elif key in ("q", "\x03"):     # q or Ctrl-C
             return False
         else:
@@ -90,7 +98,7 @@ class TeleopKeyboard(Node):
         self.publish()
         self.get_logger().info(
             f"cmd_vel: linear=({self._vx:+.2f},{self._vy:+.2f},{self._vz:+.2f})  "
-            f"angular_z={self._wz:+.2f}")
+            f"angular=({self._wy:+.2f},{self._wz:+.2f})")
         return True
 
 
