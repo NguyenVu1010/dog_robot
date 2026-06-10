@@ -33,12 +33,14 @@ PARAMS = FootTargetParams(stride_per_mps=0.20, swing_height=0.03,
                           stance_phase_ratio=0.5)
 
 
-def _make_drivers():
+def _make_drivers(logger=None):
     geoms = load_leg_geoms(URDF_JOINTS_YAML)
     return {
         name: LegDriver(geoms[name],
                         load_link_params(LINK_PARAMS_YAML, name),
-                        PARAMS)
+                        PARAMS,
+                        is_rear=(name in ("BL", "BR")),
+                        logger=logger)
         for name in LEG_NAMES
     }
 
@@ -260,3 +262,102 @@ def test_backward_velocity_produces_negative_body_x_stride(name):
     drag = bx_start - bx_end
     assert drag == pytest.approx(-0.02, abs=1e-3), (
         f"{name}: body-X drag = {drag:+.4f} (expected ~-0.02 for backward velocity)")
+
+
+# --- rear_z routing (is_rear flag) ---
+
+@pytest.mark.parametrize("name", ["FL", "FR"])
+def test_front_legs_ignore_rear_z(name):
+    drivers = _make_drivers()
+    d = drivers[name]
+    q_no_rear = d.step((0.0, 0.0), 0.25, body_z=0.0, rear_z=0.0)
+    d._last_joints = (0.0, 0.0, 0.0)
+    q_with_rear = d.step((0.0, 0.0), 0.25, body_z=0.0, rear_z=0.05)
+    np.testing.assert_allclose(
+        q_no_rear, q_with_rear, atol=1e-12,
+        err_msg=f"{name}: front leg responded to rear_z")
+
+
+@pytest.mark.parametrize("name", ["BL", "BR"])
+def test_rear_legs_respond_to_rear_z(name):
+    drivers = _make_drivers()
+    d = drivers[name]
+    q_no_rear = d.step((0.0, 0.0), 0.0, body_z=0.0, rear_z=0.0)
+    d._last_joints = (0.0, 0.0, 0.0)
+    q_with_rear = d.step((0.0, 0.0), 0.0, body_z=0.0, rear_z=0.05)
+    diff = max(abs(a - b) for a, b in zip(q_no_rear, q_with_rear))
+    assert diff > 1e-3, \
+        f"{name}: joints unchanged with rear_z=+0.05 (diff={diff})"
+
+
+@pytest.mark.parametrize("name", ["BL", "BR"])
+def test_rear_z_lifts_foot_in_body_z(name):
+    drivers = _make_drivers()
+    d = drivers[name]
+    rz = 0.05
+    q = d.step((0.0, 0.0), 0.0, body_z=0.0, rear_z=rz)
+    foot_hip = fk_leg(d.link, q)
+    foot_body = d.geom.R_base_to_hip @ foot_hip
+    rest_body = d.geom.R_base_to_hip @ d.rest_in_hip
+    expected_body = rest_body + np.array([0.0, 0.0, +rz])
+    np.testing.assert_allclose(
+        foot_body, expected_body, atol=1e-6,
+        err_msg=f"{name}: foot_body={foot_body} expected={expected_body}")
+
+
+def test_step_rear_z_default_matches_zero_explicit():
+    drivers = _make_drivers()
+    for name, d in drivers.items():
+        d._last_joints = (0.0, 0.0, 0.0)
+        q_default = d.step((0.05, 0.0), 0.25)
+        d._last_joints = (0.0, 0.0, 0.0)
+        q_explicit = d.step((0.05, 0.0), 0.25, rear_z=0.0)
+        np.testing.assert_allclose(
+            q_default, q_explicit, atol=1e-12,
+            err_msg=f"{name}: rear_z default != explicit 0.0")
+
+
+# --- WARN-once on IK saturation ---
+
+class _CountingLogger:
+    def __init__(self):
+        self.warnings = []
+
+    def warning(self, msg):
+        self.warnings.append(msg)
+
+
+def test_warn_logged_once_on_repeated_ik_failure():
+    geoms = load_leg_geoms(URDF_JOINTS_YAML)
+    log = _CountingLogger()
+    d = LegDriver(geoms["FL"],
+                  load_link_params(LINK_PARAMS_YAML, "FL"),
+                  PARAMS,
+                  is_rear=False,
+                  logger=log)
+    d.step((0.0, 0.0), 0.0)               # warm-up, success
+    d.rest_in_hip = np.array([0.0, 0.0, -0.13])  # on yaw axis -> IK raises
+    d.step((0.0, 0.0), 0.0)               # WARN #1
+    d.step((0.0, 0.0), 0.0)               # already saturated, no WARN
+    d.step((0.0, 0.0), 0.0)               # still saturated, no WARN
+    assert len(log.warnings) == 1
+
+
+def test_warn_resets_after_recovery_then_fires_again():
+    geoms = load_leg_geoms(URDF_JOINTS_YAML)
+    log = _CountingLogger()
+    d = LegDriver(geoms["FL"],
+                  load_link_params(LINK_PARAMS_YAML, "FL"),
+                  PARAMS,
+                  is_rear=False,
+                  logger=log)
+    rest_good = d.rest_in_hip.copy()
+    d.step((0.0, 0.0), 0.0)               # warm-up, success
+    d.rest_in_hip = np.array([0.0, 0.0, -0.13])
+    d.step((0.0, 0.0), 0.0)               # WARN #1
+    assert len(log.warnings) == 1
+    d.rest_in_hip = rest_good
+    d.step((0.0, 0.0), 0.0)               # success -> clear flag
+    d.rest_in_hip = np.array([0.0, 0.0, -0.13])
+    d.step((0.0, 0.0), 0.0)               # WARN #2
+    assert len(log.warnings) == 2
