@@ -1,5 +1,6 @@
-"""TeleopKeyboard key handling: r/f drive vz, space zeros all 4 axes, /cmd_vel
-publishes linear.z. Skipped when rclpy is unavailable.
+"""TeleopKeyboard key handling: r/f drive vz, i/k drive angular.y,
+space zeros all 5 axes, /cmd_vel publishes linear.z + angular.y.
+Skipped when rclpy is unavailable.
 """
 import time
 
