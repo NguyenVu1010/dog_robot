@@ -13,7 +13,7 @@ def test_default_state_is_zero():
 
 def test_on_cmd_vel_updates_state():
     b = BodyCommander()
-    b.on_cmd_vel(0.3, -0.1, 0.03, 0.5)
+    b.on_cmd_vel(0.3, -0.1, 0.03, 0.0, 0.5)
     assert b.body_vel_xy() == (0.3, -0.1)
     assert b.body_yaw_rate() == 0.5
     # linear_z is integrated via tick(); 1 s @ 0.03 m/s = 0.03 m (within default clamp).
@@ -73,7 +73,7 @@ def test_default_body_z_is_zero():
 
 def test_vz_integrates_into_body_z():
     b = BodyCommander()
-    b.on_cmd_vel(0.0, 0.0, 0.02, 0.0)
+    b.on_cmd_vel(0.0, 0.0, 0.02, 0.0, 0.0)
     b.tick(0.1)
     assert b.body_z() == pytest.approx(0.002, abs=1e-9)
     b.tick(0.1)
@@ -82,7 +82,7 @@ def test_vz_integrates_into_body_z():
 
 def test_body_z_clamps_at_max():
     b = BodyCommander()  # default body_z_max = +0.03
-    b.on_cmd_vel(0.0, 0.0, 0.10, 0.0)
+    b.on_cmd_vel(0.0, 0.0, 0.10, 0.0, 0.0)
     for _ in range(100):
         b.tick(0.01)   # vz=0.10 m/s * 1.0 s = 0.10 m commanded, well past clamp
     assert b.body_z() == pytest.approx(0.03, abs=1e-9)
@@ -90,7 +90,7 @@ def test_body_z_clamps_at_max():
 
 def test_body_z_clamps_at_min():
     b = BodyCommander()  # default body_z_min = -0.03
-    b.on_cmd_vel(0.0, 0.0, -0.10, 0.0)
+    b.on_cmd_vel(0.0, 0.0, -0.10, 0.0, 0.0)
     for _ in range(100):
         b.tick(0.01)
     assert b.body_z() == pytest.approx(-0.03, abs=1e-9)
@@ -98,18 +98,87 @@ def test_body_z_clamps_at_min():
 
 def test_space_zeros_vz_halts_integration():
     b = BodyCommander()
-    b.on_cmd_vel(0.0, 0.0, 0.02, 0.0)
+    b.on_cmd_vel(0.0, 0.0, 0.02, 0.0, 0.0)
     b.tick(0.5)
     z_after_drive = b.body_z()
     assert z_after_drive == pytest.approx(0.01, abs=1e-9)
-    b.on_cmd_vel(0.0, 0.0, 0.0, 0.0)   # space
+    b.on_cmd_vel(0.0, 0.0, 0.0, 0.0, 0.0)   # space
     b.tick(1.0)
     assert b.body_z() == pytest.approx(z_after_drive, abs=1e-9)
 
 
 def test_body_z_min_max_params_respected():
     b = BodyCommander(body_z_min=-0.10, body_z_max=+0.10)
-    b.on_cmd_vel(0.0, 0.0, 1.0, 0.0)
+    b.on_cmd_vel(0.0, 0.0, 1.0, 0.0, 0.0)
     for _ in range(50):
         b.tick(0.01)
     assert b.body_z() == pytest.approx(0.10, abs=1e-9)
+
+
+# --- rear_z tests ---
+
+def test_default_rear_z_is_zero():
+    b = BodyCommander()
+    assert b.rear_z() == 0.0
+
+
+def test_wy_integrates_into_rear_z():
+    b = BodyCommander()
+    b.on_cmd_vel(0.0, 0.0, 0.0, 0.04, 0.0)
+    b.tick(0.1)
+    assert b.rear_z() == pytest.approx(0.004, abs=1e-9)
+    b.tick(0.1)
+    assert b.rear_z() == pytest.approx(0.008, abs=1e-9)
+
+
+def test_rear_z_clamps_at_max():
+    b = BodyCommander()  # default rear_z_max = +0.05
+    b.on_cmd_vel(0.0, 0.0, 0.0, 0.10, 0.0)
+    for _ in range(100):
+        b.tick(0.01)
+    assert b.rear_z() == pytest.approx(0.05, abs=1e-9)
+
+
+def test_rear_z_clamps_at_min():
+    b = BodyCommander()  # default rear_z_min = -0.05
+    b.on_cmd_vel(0.0, 0.0, 0.0, -0.10, 0.0)
+    for _ in range(100):
+        b.tick(0.01)
+    assert b.rear_z() == pytest.approx(-0.05, abs=1e-9)
+
+
+def test_rear_z_min_max_params_respected():
+    b = BodyCommander(rear_z_min=-0.10, rear_z_max=+0.10)
+    b.on_cmd_vel(0.0, 0.0, 0.0, 1.0, 0.0)
+    for _ in range(50):
+        b.tick(0.01)
+    assert b.rear_z() == pytest.approx(0.10, abs=1e-9)
+
+
+def test_wy_does_not_affect_body_z():
+    b = BodyCommander()
+    b.on_cmd_vel(0.0, 0.0, 0.0, 0.10, 0.0)
+    for _ in range(100):
+        b.tick(0.01)
+    assert b.body_z() == 0.0
+    assert b.rear_z() == pytest.approx(0.05, abs=1e-9)
+
+
+def test_vz_does_not_affect_rear_z():
+    b = BodyCommander()
+    b.on_cmd_vel(0.0, 0.0, 0.10, 0.0, 0.0)
+    for _ in range(100):
+        b.tick(0.01)
+    assert b.rear_z() == 0.0
+    assert b.body_z() == pytest.approx(0.03, abs=1e-9)
+
+
+def test_space_zeros_wy_halts_rear_z_integration():
+    b = BodyCommander()
+    b.on_cmd_vel(0.0, 0.0, 0.0, 0.04, 0.0)
+    b.tick(0.5)
+    rz_after = b.rear_z()
+    assert rz_after == pytest.approx(0.02, abs=1e-9)
+    b.on_cmd_vel(0.0, 0.0, 0.0, 0.0, 0.0)  # space
+    b.tick(1.0)
+    assert b.rear_z() == pytest.approx(rz_after, abs=1e-9)

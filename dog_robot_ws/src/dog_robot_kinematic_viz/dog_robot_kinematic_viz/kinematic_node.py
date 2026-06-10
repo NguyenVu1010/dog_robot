@@ -117,7 +117,8 @@ class KinematicNode(Node):
 
     def _on_cmd_vel(self, msg: Twist) -> None:
         self.commander.on_cmd_vel(
-            msg.linear.x, msg.linear.y, msg.linear.z, msg.angular.z)
+            msg.linear.x, msg.linear.y, msg.linear.z,
+            msg.angular.y, msg.angular.z)
 
     def _tick(self) -> None:
         now = time.monotonic()
