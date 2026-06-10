@@ -45,6 +45,7 @@ class LegDriver:
             phase,
             body_v_xy,
             body_z,
+            0.0,  # extra_z: wired to rear_z in Task 3
             self.geom.R_base_to_hip,
             self.ft,
         )

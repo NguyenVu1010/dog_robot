@@ -4,6 +4,10 @@ The gait stride and lift are physically defined in BODY frame:
 - Stride: horizontal displacement in body +X/+Y plane, proportional to body velocity.
 - Lift: vertical displacement in body +Z, only during swing phase.
 - body_z translation: the body raises in body +Z; feet drop -body_z in body to compensate.
+- extra_z translation: foot-frame-agnostic body-Z lift, added on top. Used by
+  rear legs to fold toward the body for the sit pose. Sign is opposite to body_z
+  because the two scalars describe different things — see the spec's
+  Sign Convention subsection.
 
 After computing the full body-frame displacement, rotate into the leg's hip
 frame (using R_base_to_hip.T) and add to rest_in_hip for ik_leg.
@@ -33,6 +37,7 @@ def foot_target_in_hip(rest_in_hip: np.ndarray,
                        phase: float,
                        v_body_xy: tuple[float, float],
                        body_z: float,
+                       extra_z: float,
                        R_base_to_hip: np.ndarray,
                        params: FootTargetParams) -> np.ndarray:
     """Return foot target in hip frame.
@@ -41,6 +46,9 @@ def foot_target_in_hip(rest_in_hip: np.ndarray,
     phase: in [0, 1). Wraps automatically.
     v_body_xy: body-frame XY velocity (m/s). Forward = (+vx, 0).
     body_z: body-frame Z translation (m), clamped upstream in BodyCommander.
+            Subtracted from foot Z (body rising drops the foot in body frame).
+    extra_z: additional body-Z foot-lift (m). Added on top of -body_z. Callers
+            pass rear_z (BL/BR) or 0.0 (FL/FR).
     R_base_to_hip: hip->body rotation matrix for this leg (3x3, orthonormal).
     params: gait shape.
     """
@@ -65,11 +73,11 @@ def foot_target_in_hip(rest_in_hip: np.ndarray,
         z_lift_body = params.swing_height * np.sin(np.pi * u) * swing_scale
 
     # Full body-frame displacement from rest:
-    #   stride (XY) + swing lift (Z) + body_z compensation (foot drops -body_z).
+    #   stride (XY) + swing lift (Z) + body_z compensation - extra_z lift.
     disp_body = np.array([
         sx_body * scale,
         sy_body * scale,
-        z_lift_body - float(body_z),
+        z_lift_body - float(body_z) + float(extra_z),
     ])
 
     # Rotate body-frame displacement into hip frame and add to rest.

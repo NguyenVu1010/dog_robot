@@ -106,7 +106,7 @@ def test_fk_of_step_matches_commanded_target_on_forward_velocity(name):
         q = d.step(v, float(phi))
         foot_fk = fk_leg(d.link, q)
         expected = foot_target_in_hip(
-            d.rest_in_hip, float(phi), v, 0.0,
+            d.rest_in_hip, float(phi), v, 0.0, 0.0,
             d.geom.R_base_to_hip, PARAMS)
         np.testing.assert_allclose(
             foot_fk, expected, atol=1e-6,

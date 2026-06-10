@@ -18,9 +18,9 @@ EYE = np.eye(3)
 PHI_APEX = PARAMS.stance_phase_ratio + 0.5 * (1.0 - PARAMS.stance_phase_ratio)
 
 
-def _ft(rest, phi, v_body, body_z=0.0, R=EYE, params=PARAMS):
+def _ft(rest, phi, v_body, body_z=0.0, extra_z=0.0, R=EYE, params=PARAMS):
     """Test helper: call foot_target_in_hip with sensible defaults."""
-    return foot_target_in_hip(rest, phi, v_body, body_z, R, params)
+    return foot_target_in_hip(rest, phi, v_body, body_z, extra_z, R, params)
 
 
 def test_zero_velocity_holds_rest():
@@ -145,3 +145,35 @@ def test_body_z_composes_with_swing_lift():
     # At swing apex with full velocity: foot z = rest + swing_height - body_z.
     p = _ft(REST, PHI_APEX, (0.10, 0.0), body_z=0.02)
     np.testing.assert_allclose(p[2], REST[2] + PARAMS.swing_height - 0.02, atol=1e-12)
+
+
+# --- extra_z tests ---
+
+def test_extra_z_zero_matches_baseline():
+    # Regression: extra_z=0 (new arg) preserves existing behavior at every phase.
+    for phi in (0.0, 0.25, PHI_APEX, 0.75):
+        p_default = _ft(REST, phi, (0.10, 0.0))
+        p_explicit = _ft(REST, phi, (0.10, 0.0), extra_z=0.0)
+        np.testing.assert_allclose(
+            p_default, p_explicit, atol=1e-12,
+            err_msg=f"phi={phi}: extra_z default != extra_z=0.0")
+
+
+def test_extra_z_lifts_foot_in_body_z():
+    # extra_z=+0.05 should LIFT the foot by +0.05 in body Z (R=I so body=hip).
+    p = _ft(REST, 0.0, (0.0, 0.0), extra_z=0.05)
+    np.testing.assert_allclose(p[2], REST[2] + 0.05, atol=1e-12)
+    np.testing.assert_allclose(p[:2], REST[:2], atol=1e-12)
+
+
+def test_extra_z_composes_with_body_z():
+    # body_z=+0.02 drops foot -0.02, extra_z=+0.05 lifts +0.05 -> net +0.03.
+    p = _ft(REST, 0.0, (0.0, 0.0), body_z=0.02, extra_z=0.05)
+    np.testing.assert_allclose(p[2], REST[2] + 0.03, atol=1e-12)
+
+
+def test_extra_z_composes_with_swing_lift():
+    # At swing apex with full velocity: foot z = rest + swing_height + extra_z.
+    p = _ft(REST, PHI_APEX, (0.10, 0.0), extra_z=0.04)
+    np.testing.assert_allclose(
+        p[2], REST[2] + PARAMS.swing_height + 0.04, atol=1e-12)
