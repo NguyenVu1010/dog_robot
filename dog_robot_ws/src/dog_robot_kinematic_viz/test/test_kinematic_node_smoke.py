@@ -274,3 +274,71 @@ def test_inactive_legs_have_empty_foot_trail_markers(rclpy_ctx):
 
     node.destroy_node()
     listener.destroy_node()
+
+
+def test_rear_z_range_params_passed_to_commander(rclpy_ctx):
+    node = KinematicNode(parameter_overrides=_overrides(
+        rear_z_min=-0.10, rear_z_max=+0.10))
+    assert node.commander.rear_z_min == pytest.approx(-0.10)
+    assert node.commander.rear_z_max == pytest.approx(+0.10)
+    node.destroy_node()
+
+
+def test_angular_y_drives_only_rear_legs(rclpy_ctx):
+    # step_freq=0.0 freezes the gait clock so only rear_z can move joints.
+    node = KinematicNode(parameter_overrides=_overrides(step_freq=0.0))
+
+    listener = rclpy.create_node("rear_z_listener")
+    received: list[JointState] = []
+    listener.create_subscription(
+        JointState, "/joint_states", lambda m: received.append(m), 10)
+
+    publisher = rclpy.create_node("rear_z_publisher")
+    pub = publisher.create_publisher(Twist, "/cmd_vel", 10)
+
+    ex = SingleThreadedExecutor()
+    ex.add_node(node)
+    ex.add_node(listener)
+    ex.add_node(publisher)
+
+    # Warm-up baseline.
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 0.4:
+        ex.spin_once(timeout_sec=0.02)
+    assert received
+    snapshot_pre = list(received[-1].position)
+
+    # Drive angular.y = +0.04 m/s for ~0.6 s -> rear_z ~ +0.024
+    # (under the default +0.05 clamp).
+    twist = Twist()
+    twist.angular.y = 0.04
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 0.6:
+        pub.publish(twist)
+        ex.spin_once(timeout_sec=0.02)
+    snapshot_post = list(received[-1].position)
+
+    # Joint layout (12 floats): FL[0..3) FR[3..6) BL[6..9) BR[9..12).
+    # Front legs must NOT move.
+    for i in range(6):
+        assert snapshot_post[i] == pytest.approx(snapshot_pre[i], abs=1e-6), (
+            f"front joint {i} drifted: "
+            f"{snapshot_pre[i]} -> {snapshot_post[i]}")
+    # Rear legs MUST move.
+    rear_delta = max(
+        abs(snapshot_post[i] - snapshot_pre[i]) for i in range(6, 12))
+    assert rear_delta > 1e-3, (
+        f"rear joints did not respond to angular.y (max delta={rear_delta})")
+
+    node.destroy_node()
+    listener.destroy_node()
+    publisher.destroy_node()
+
+
+def test_only_bl_br_drivers_are_rear(rclpy_ctx):
+    node = KinematicNode(parameter_overrides=_overrides())
+    assert node.drivers["FL"].is_rear is False
+    assert node.drivers["FR"].is_rear is False
+    assert node.drivers["BL"].is_rear is True
+    assert node.drivers["BR"].is_rear is True
+    node.destroy_node()
