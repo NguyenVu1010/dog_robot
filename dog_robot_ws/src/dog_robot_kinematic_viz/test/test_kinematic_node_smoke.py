@@ -305,7 +305,7 @@ def test_angular_y_drives_only_rear_legs(rclpy_ctx):
     t0 = time.monotonic()
     while time.monotonic() - t0 < 0.4:
         ex.spin_once(timeout_sec=0.02)
-    assert received
+    assert received, "no /joint_states received during rear_z warm-up"
     snapshot_pre = list(received[-1].position)
 
     # Drive angular.y = +0.04 m/s for ~0.6 s -> rear_z ~ +0.024
