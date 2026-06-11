@@ -30,6 +30,7 @@ setup(
         "console_scripts": [
             "kinematic_node = dog_robot_kinematic_viz.kinematic_node:main",
             "teleop_keyboard = dog_robot_kinematic_viz.teleop_keyboard:main",
+            "gui_teleop = dog_robot_kinematic_viz.gui_teleop:main",
         ],
     },
 )
