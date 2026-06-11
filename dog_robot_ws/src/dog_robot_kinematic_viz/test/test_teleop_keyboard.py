@@ -107,7 +107,7 @@ def test_q_key_returns_false(rclpy_ctx):
     node.destroy_node()
 
 
-# --- i/k -> angular.y (rear-height velocity) ---
+# --- i/k -> angular.y (body pitch velocity) ---
 
 def test_i_key_increments_wy(rclpy_ctx):
     node = TeleopKeyboard()

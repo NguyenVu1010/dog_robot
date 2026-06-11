@@ -300,6 +300,8 @@ def test_rear_legs_fold_with_positive_pitch(name):
 
 
 def test_front_rear_displacements_are_opposite_signs():
+    # The exact ±pitch assertion holds because R_base_to_hip for every leg is
+    # a yaw-only rotation of the body frame (no Z-column mixing).
     drivers = _make_drivers()
     pitch = 0.04
     # Same pitch in, opposite Z-displacement out (after FK->body-frame).

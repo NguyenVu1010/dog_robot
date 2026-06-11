@@ -4,10 +4,10 @@ The gait stride and lift are physically defined in BODY frame:
 - Stride: horizontal displacement in body +X/+Y plane, proportional to body velocity.
 - Lift: vertical displacement in body +Z, only during swing phase.
 - body_z translation: the body raises in body +Z; feet drop -body_z in body to compensate.
-- extra_z translation: leg-frame-agnostic body-Z lift, added on top. Used by
-  rear legs to fold toward the body for the sit pose. Sign is opposite to body_z
-  because the two scalars describe different things — see the spec's
-  Sign Convention subsection.
+- extra_z translation: leg-frame-agnostic body-Z foot-lift, added on top. Used
+  by rear legs (+pitch_amount, fold toward body) and front legs (-pitch_amount,
+  extend away) — see the spec's Sign Convention subsection. Sign is opposite
+  to body_z because the two scalars describe different things.
 
 After computing the full body-frame displacement, rotate into the leg's hip
 frame (using R_base_to_hip.T) and add to rest_in_hip for ik_leg.
@@ -47,8 +47,9 @@ def foot_target_in_hip(rest_in_hip: np.ndarray,
     v_body_xy: body-frame XY velocity (m/s). Forward = (+vx, 0).
     body_z: body-frame Z translation (m), clamped upstream in BodyCommander.
             Subtracted from foot Z (body rising drops the foot in body frame).
-    extra_z: leg-frame-agnostic body-Z foot-lift (m). Added on top of -body_z. Callers
-            pass rear_z (BL/BR) or 0.0 (FL/FR).
+    extra_z: leg-frame-agnostic body-Z foot-lift (m). Added on top of -body_z.
+            Callers pass +pitch_amount (rear legs, fold) or -pitch_amount
+            (front legs, extend).
     R_base_to_hip: hip->body rotation matrix for this leg (3x3, orthonormal).
     params: gait shape.
     """
