@@ -2,8 +2,9 @@
 
 This is the "1 chân -> kế thừa các chân" unit: one class instantiated 4x,
 once per leg. The 4 instances differ only in `geom` (per-leg base->hip),
-`link_params` (per-leg LinkParams), and `is_rear` (True for BL/BR — they
-respond to rear_z; FL/FR ignore it).
+`link_params` (per-leg LinkParams), and `is_rear` (True for BL/BR — the
+sign of pitch_amount's contribution to extra_z flips between front and
+rear).
 
 The foot oscillates around the leg's CAD rest pose `fk_leg(link, (0,0,0))`
 so joint angles stay near zero (well inside limits) and the IK never
@@ -11,10 +12,12 @@ hits the hip-axis singularity that ik_leg raises on.
 
 Architecture: foot_target_in_hip receives body-frame velocity and rotates
 it into the hip frame internally. LegDriver is a thin wrapper: it passes
-body velocity + R_base_to_hip directly to foot_target_in_hip and decides
-whether to forward `rear_z` (rear legs) or 0.0 (front legs) as `extra_z`.
+body velocity + R_base_to_hip directly to foot_target_in_hip and chooses
+the sign of pitch_amount per leg — `+pitch_amount` on rear legs (fold),
+`-pitch_amount` on front legs (extend). This gives a virtual body pitch
+on a single scalar input.
 
-On IK failure (foot target unreachable, e.g. combined body_z + rear_z past
+On IK failure (foot target unreachable, e.g. combined body_z + pitch past
 leg reach) LegDriver returns the last good joints and logs a WARN exactly
 once per saturation event (cleared on next success).
 """
@@ -50,8 +53,9 @@ class LegDriver:
     def step(self, body_v_xy: Tuple[float, float],
              phase: float,
              body_z: float = 0.0,
-             rear_z: float = 0.0) -> Tuple[float, float, float]:
-        extra_z = float(rear_z) if self.is_rear else 0.0
+             pitch_amount: float = 0.0) -> Tuple[float, float, float]:
+        p = float(pitch_amount)
+        extra_z = p if self.is_rear else -p
         target = foot_target_in_hip(
             self.rest_in_hip,
             phase,

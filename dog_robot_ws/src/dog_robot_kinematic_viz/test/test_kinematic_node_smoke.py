@@ -276,24 +276,24 @@ def test_inactive_legs_have_empty_foot_trail_markers(rclpy_ctx):
     listener.destroy_node()
 
 
-def test_rear_z_range_params_passed_to_commander(rclpy_ctx):
+def test_pitch_range_params_passed_to_commander(rclpy_ctx):
     node = KinematicNode(parameter_overrides=_overrides(
-        rear_z_min=-0.10, rear_z_max=+0.10))
-    assert node.commander.rear_z_min == pytest.approx(-0.10)
-    assert node.commander.rear_z_max == pytest.approx(+0.10)
+        pitch_min=-0.10, pitch_max=+0.10))
+    assert node.commander.pitch_min == pytest.approx(-0.10)
+    assert node.commander.pitch_max == pytest.approx(+0.10)
     node.destroy_node()
 
 
-def test_angular_y_drives_only_rear_legs(rclpy_ctx):
-    # step_freq=0.0 freezes the gait clock so only rear_z can move joints.
+def test_angular_y_pitches_all_four_legs_opposite_signs(rclpy_ctx):
+    # step_freq=0.0 freezes the gait clock so only pitch_amount can move joints.
     node = KinematicNode(parameter_overrides=_overrides(step_freq=0.0))
 
-    listener = rclpy.create_node("rear_z_listener")
+    listener = rclpy.create_node("pitch_listener")
     received: list[JointState] = []
     listener.create_subscription(
         JointState, "/joint_states", lambda m: received.append(m), 10)
 
-    publisher = rclpy.create_node("rear_z_publisher")
+    publisher = rclpy.create_node("pitch_publisher")
     pub = publisher.create_publisher(Twist, "/cmd_vel", 10)
 
     ex = SingleThreadedExecutor()
@@ -301,14 +301,14 @@ def test_angular_y_drives_only_rear_legs(rclpy_ctx):
     ex.add_node(listener)
     ex.add_node(publisher)
 
-    # Warm-up baseline.
+    # Warm-up baseline at pitch=0.
     t0 = time.monotonic()
     while time.monotonic() - t0 < 0.4:
         ex.spin_once(timeout_sec=0.02)
-    assert received, "no /joint_states received during rear_z warm-up"
+    assert received, "no /joint_states received during pitch warm-up"
     snapshot_pre = list(received[-1].position)
 
-    # Drive angular.y = +0.04 m/s for ~0.6 s -> rear_z ~ +0.024
+    # Drive angular.y = +0.04 m/s for ~0.6 s -> pitch ~ +0.024
     # (under the default +0.05 clamp).
     twist = Twist()
     twist.angular.y = 0.04
@@ -319,16 +319,11 @@ def test_angular_y_drives_only_rear_legs(rclpy_ctx):
     snapshot_post = list(received[-1].position)
 
     # Joint layout (12 floats): FL[0..3) FR[3..6) BL[6..9) BR[9..12).
-    # Front legs must NOT move.
-    for i in range(6):
-        assert snapshot_post[i] == pytest.approx(snapshot_pre[i], abs=1e-6), (
-            f"front joint {i} drifted: "
-            f"{snapshot_pre[i]} -> {snapshot_post[i]}")
-    # Rear legs MUST move.
-    rear_delta = max(
-        abs(snapshot_post[i] - snapshot_pre[i]) for i in range(6, 12))
-    assert rear_delta > 1e-3, (
-        f"rear joints did not respond to angular.y (max delta={rear_delta})")
+    # All four legs must move — both front and rear.
+    front_delta = max(abs(snapshot_post[i] - snapshot_pre[i]) for i in range(0, 6))
+    rear_delta = max(abs(snapshot_post[i] - snapshot_pre[i]) for i in range(6, 12))
+    assert front_delta > 1e-3, f"front joints did not respond to angular.y (delta={front_delta})"
+    assert rear_delta > 1e-3, f"rear joints did not respond to angular.y (delta={rear_delta})"
 
     node.destroy_node()
     listener.destroy_node()

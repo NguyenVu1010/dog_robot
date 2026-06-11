@@ -264,57 +264,68 @@ def test_backward_velocity_produces_negative_body_x_stride(name):
         f"{name}: body-X drag = {drag:+.4f} (expected ~-0.02 for backward velocity)")
 
 
-# --- rear_z routing (is_rear flag) ---
+# --- pitch_amount routing (per-leg sign flip) ---
 
 @pytest.mark.parametrize("name", ["FL", "FR"])
-def test_front_legs_ignore_rear_z(name):
+def test_front_legs_extend_with_positive_pitch(name):
     drivers = _make_drivers()
     d = drivers[name]
-    q_no_rear = d.step((0.0, 0.0), 0.25, body_z=0.0, rear_z=0.0)
-    d._last_joints = (0.0, 0.0, 0.0)
-    q_with_rear = d.step((0.0, 0.0), 0.25, body_z=0.0, rear_z=0.05)
-    np.testing.assert_allclose(
-        q_no_rear, q_with_rear, atol=1e-12,
-        err_msg=f"{name}: front leg responded to rear_z")
-
-
-@pytest.mark.parametrize("name", ["BL", "BR"])
-def test_rear_legs_respond_to_rear_z(name):
-    drivers = _make_drivers()
-    d = drivers[name]
-    q_no_rear = d.step((0.0, 0.0), 0.0, body_z=0.0, rear_z=0.0)
-    d._last_joints = (0.0, 0.0, 0.0)
-    q_with_rear = d.step((0.0, 0.0), 0.0, body_z=0.0, rear_z=0.05)
-    diff = max(abs(a - b) for a, b in zip(q_no_rear, q_with_rear))
-    assert diff > 1e-3, \
-        f"{name}: joints unchanged with rear_z=+0.05 (diff={diff})"
-
-
-@pytest.mark.parametrize("name", ["BL", "BR"])
-def test_rear_z_lifts_foot_in_body_z(name):
-    drivers = _make_drivers()
-    d = drivers[name]
-    rz = 0.05
-    q = d.step((0.0, 0.0), 0.0, body_z=0.0, rear_z=rz)
+    pitch = 0.05
+    q = d.step((0.0, 0.0), 0.0, body_z=0.0, pitch_amount=pitch)
     foot_hip = fk_leg(d.link, q)
     foot_body = d.geom.R_base_to_hip @ foot_hip
     rest_body = d.geom.R_base_to_hip @ d.rest_in_hip
-    expected_body = rest_body + np.array([0.0, 0.0, +rz])
+    # Positive pitch on a FRONT leg means extra_z = -pitch, so foot drops -pitch
+    # in body Z (leg extends away from body).
+    expected_body = rest_body + np.array([0.0, 0.0, -pitch])
     np.testing.assert_allclose(
         foot_body, expected_body, atol=1e-6,
         err_msg=f"{name}: foot_body={foot_body} expected={expected_body}")
 
 
-def test_step_rear_z_default_matches_zero_explicit():
+@pytest.mark.parametrize("name", ["BL", "BR"])
+def test_rear_legs_fold_with_positive_pitch(name):
+    drivers = _make_drivers()
+    d = drivers[name]
+    pitch = 0.05
+    q = d.step((0.0, 0.0), 0.0, body_z=0.0, pitch_amount=pitch)
+    foot_hip = fk_leg(d.link, q)
+    foot_body = d.geom.R_base_to_hip @ foot_hip
+    rest_body = d.geom.R_base_to_hip @ d.rest_in_hip
+    # Positive pitch on a REAR leg means extra_z = +pitch, foot lifts toward body.
+    expected_body = rest_body + np.array([0.0, 0.0, +pitch])
+    np.testing.assert_allclose(
+        foot_body, expected_body, atol=1e-6,
+        err_msg=f"{name}: foot_body={foot_body} expected={expected_body}")
+
+
+def test_front_rear_displacements_are_opposite_signs():
+    drivers = _make_drivers()
+    pitch = 0.04
+    # Same pitch in, opposite Z-displacement out (after FK->body-frame).
+    deltas = {}
+    for name, d in drivers.items():
+        q = d.step((0.0, 0.0), 0.0, body_z=0.0, pitch_amount=pitch)
+        foot_body = d.geom.R_base_to_hip @ fk_leg(d.link, q)
+        rest_body = d.geom.R_base_to_hip @ d.rest_in_hip
+        deltas[name] = (foot_body - rest_body)[2]
+    # Front gets -pitch, rear gets +pitch.
+    assert deltas["FL"] == pytest.approx(-pitch, abs=1e-6)
+    assert deltas["FR"] == pytest.approx(-pitch, abs=1e-6)
+    assert deltas["BL"] == pytest.approx(+pitch, abs=1e-6)
+    assert deltas["BR"] == pytest.approx(+pitch, abs=1e-6)
+
+
+def test_step_pitch_default_matches_zero_explicit():
     drivers = _make_drivers()
     for name, d in drivers.items():
         d._last_joints = (0.0, 0.0, 0.0)
         q_default = d.step((0.05, 0.0), 0.25)
         d._last_joints = (0.0, 0.0, 0.0)
-        q_explicit = d.step((0.05, 0.0), 0.25, rear_z=0.0)
+        q_explicit = d.step((0.05, 0.0), 0.25, pitch_amount=0.0)
         np.testing.assert_allclose(
             q_default, q_explicit, atol=1e-12,
-            err_msg=f"{name}: rear_z default != explicit 0.0")
+            err_msg=f"{name}: pitch_amount default != explicit 0.0")
 
 
 # --- WARN-once on IK saturation ---
@@ -352,7 +363,7 @@ def test_warn_resets_after_recovery_then_fires_again():
                   is_rear=False,
                   logger=log)
     rest_good = d.rest_in_hip.copy()
-    d.step((0.0, 0.0), 0.0)               # warm-up, success
+    d.step((0.0, 0.0), 0.0)
     d.rest_in_hip = np.array([0.0, 0.0, -0.13])
     d.step((0.0, 0.0), 0.0)               # WARN #1
     assert len(log.warnings) == 1

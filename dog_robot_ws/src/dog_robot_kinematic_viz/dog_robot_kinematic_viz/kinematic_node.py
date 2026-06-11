@@ -54,8 +54,8 @@ class KinematicNode(Node):
         self.declare_parameter("swing_activation_speed", 0.05)
         self.declare_parameter("body_z_min", -0.03)
         self.declare_parameter("body_z_max", +0.03)
-        self.declare_parameter("rear_z_min", -0.05)
-        self.declare_parameter("rear_z_max", +0.05)
+        self.declare_parameter("pitch_min", -0.05)
+        self.declare_parameter("pitch_max", +0.05)
         self.declare_parameter("foot_trail_max_points", 300)
 
         publish_rate = float(self.get_parameter("publish_rate").value)
@@ -90,8 +90,8 @@ class KinematicNode(Node):
             step_freq=float(self.get_parameter("step_freq").value),
             body_z_min=float(self.get_parameter("body_z_min").value),
             body_z_max=float(self.get_parameter("body_z_max").value),
-            rear_z_min=float(self.get_parameter("rear_z_min").value),
-            rear_z_max=float(self.get_parameter("rear_z_max").value))
+            pitch_min=float(self.get_parameter("pitch_min").value),
+            pitch_max=float(self.get_parameter("pitch_max").value))
         self.drivers: Dict[str, LegDriver] = {
             name: LegDriver(geoms[name],
                             load_link_params(link_yaml, name),
@@ -134,12 +134,12 @@ class KinematicNode(Node):
 
         v_xy = self.commander.body_vel_xy()
         bz = self.commander.body_z()
-        rz = self.commander.rear_z()
+        pitch = self.commander.pitch_amount()
         positions: List[float] = []
         for leg in LEG_NAMES:
             if leg in self.drivers:
                 q = self.drivers[leg].step(
-                    v_xy, self.commander.phase(leg), bz, rz)
+                    v_xy, self.commander.phase(leg), bz, pitch)
             else:
                 q = self._idle
             positions.extend(float(x) for x in q)

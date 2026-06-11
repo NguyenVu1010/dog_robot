@@ -9,7 +9,7 @@ Keys:
     w / s  : linear.x  +/-   (forward / back)
     a / d  : linear.y  +/-   (strafe left / right)
     r / f  : linear.z  +/-   (body up / down — height velocity)
-    i / k  : angular.y +/-   (rear up / down — rear-height velocity)
+    i / k  : angular.y +/-   (sit / unsit — body pitch velocity)
     j / l  : angular.z +/-   (yaw left / right)
     space  : zero all five axes
     q      : quit
@@ -36,7 +36,7 @@ HELP = """
     w/s  forward / back     (linear.x)
     a/d  left / right       (linear.y)
     r/f  body up / down     (linear.z — height velocity)
-    i/k  rear up / down     (angular.y — rear-height velocity)
+    i/k  sit / unsit        (angular.y — body pitch velocity)
     j/l  yaw left / right   (angular.z)
     space  zero all
     q      quit

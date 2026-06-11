@@ -115,44 +115,44 @@ def test_body_z_min_max_params_respected():
     assert b.body_z() == pytest.approx(0.10, abs=1e-9)
 
 
-# --- rear_z tests ---
+# --- pitch_amount tests ---
 
-def test_default_rear_z_is_zero():
+def test_default_pitch_is_zero():
     b = BodyCommander()
-    assert b.rear_z() == 0.0
+    assert b.pitch_amount() == 0.0
 
 
-def test_wy_integrates_into_rear_z():
+def test_wy_integrates_into_pitch():
     b = BodyCommander()
     b.on_cmd_vel(0.0, 0.0, 0.0, 0.04, 0.0)
     b.tick(0.1)
-    assert b.rear_z() == pytest.approx(0.004, abs=1e-9)
+    assert b.pitch_amount() == pytest.approx(0.004, abs=1e-9)
     b.tick(0.1)
-    assert b.rear_z() == pytest.approx(0.008, abs=1e-9)
+    assert b.pitch_amount() == pytest.approx(0.008, abs=1e-9)
 
 
-def test_rear_z_clamps_at_max():
-    b = BodyCommander()  # default rear_z_max = +0.05
+def test_pitch_clamps_at_max():
+    b = BodyCommander()  # default pitch_max = +0.05
     b.on_cmd_vel(0.0, 0.0, 0.0, 0.10, 0.0)
     for _ in range(100):
         b.tick(0.01)
-    assert b.rear_z() == pytest.approx(0.05, abs=1e-9)
+    assert b.pitch_amount() == pytest.approx(0.05, abs=1e-9)
 
 
-def test_rear_z_clamps_at_min():
-    b = BodyCommander()  # default rear_z_min = -0.05
+def test_pitch_clamps_at_min():
+    b = BodyCommander()  # default pitch_min = -0.05
     b.on_cmd_vel(0.0, 0.0, 0.0, -0.10, 0.0)
     for _ in range(100):
         b.tick(0.01)
-    assert b.rear_z() == pytest.approx(-0.05, abs=1e-9)
+    assert b.pitch_amount() == pytest.approx(-0.05, abs=1e-9)
 
 
-def test_rear_z_min_max_params_respected():
-    b = BodyCommander(rear_z_min=-0.10, rear_z_max=+0.10)
+def test_pitch_min_max_params_respected():
+    b = BodyCommander(pitch_min=-0.10, pitch_max=+0.10)
     b.on_cmd_vel(0.0, 0.0, 0.0, 1.0, 0.0)
     for _ in range(50):
         b.tick(0.01)
-    assert b.rear_z() == pytest.approx(0.10, abs=1e-9)
+    assert b.pitch_amount() == pytest.approx(0.10, abs=1e-9)
 
 
 def test_wy_does_not_affect_body_z():
@@ -161,24 +161,24 @@ def test_wy_does_not_affect_body_z():
     for _ in range(100):
         b.tick(0.01)
     assert b.body_z() == 0.0
-    assert b.rear_z() == pytest.approx(0.05, abs=1e-9)
+    assert b.pitch_amount() == pytest.approx(0.05, abs=1e-9)
 
 
-def test_vz_does_not_affect_rear_z():
+def test_vz_does_not_affect_pitch():
     b = BodyCommander()
     b.on_cmd_vel(0.0, 0.0, 0.10, 0.0, 0.0)
     for _ in range(100):
         b.tick(0.01)
-    assert b.rear_z() == 0.0
+    assert b.pitch_amount() == 0.0
     assert b.body_z() == pytest.approx(0.03, abs=1e-9)
 
 
-def test_space_zeros_wy_halts_rear_z_integration():
+def test_space_zeros_wy_halts_pitch_integration():
     b = BodyCommander()
     b.on_cmd_vel(0.0, 0.0, 0.0, 0.04, 0.0)
     b.tick(0.5)
-    rz_after = b.rear_z()
-    assert rz_after == pytest.approx(0.02, abs=1e-9)
+    pitch_after = b.pitch_amount()
+    assert pitch_after == pytest.approx(0.02, abs=1e-9)
     b.on_cmd_vel(0.0, 0.0, 0.0, 0.0, 0.0)  # space
     b.tick(1.0)
-    assert b.rear_z() == pytest.approx(rz_after, abs=1e-9)
+    assert b.pitch_amount() == pytest.approx(pitch_after, abs=1e-9)
