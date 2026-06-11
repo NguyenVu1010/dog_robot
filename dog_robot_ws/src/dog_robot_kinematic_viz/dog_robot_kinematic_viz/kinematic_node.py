@@ -147,8 +147,19 @@ class KinematicNode(Node):
             msg.angular.y, msg.angular.z)
 
     def _on_sit(self, request, response):
+        # Re-read the parameter so `ros2 param set` lets the user tune the pose
+        # at runtime without restarting the node. Validation matches __init__.
+        sit_pose = list(self.get_parameter("sit_pose_joints").value)
+        if len(sit_pose) != 12:
+            response.success = False
+            response.message = (
+                f"sit_pose_joints must have 12 entries, got {len(sit_pose)}")
+            self.get_logger().error(response.message)
+            return response
+        self._sit_pose_joints = tuple(float(x) for x in sit_pose)
         self._locked_joints = self._sit_pose_joints
-        self.get_logger().info("pose lock: /sit engaged")
+        self.get_logger().info(
+            f"pose lock: /sit engaged with joints={self._sit_pose_joints}")
         response.success = True
         response.message = "sit pose locked"
         return response

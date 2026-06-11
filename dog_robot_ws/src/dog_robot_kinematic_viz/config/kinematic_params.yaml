@@ -10,24 +10,30 @@ kinematic_node:
     pitch_min: -0.05
     pitch_max: +0.05
     # Sit-pose joint snapshot (12 floats in FL/FR/BL/BR × hip_roll/thigh_pitch/knee_pitch order).
-    # Engaged via service `/sit`. Released via `/release`. Front legs stay near
-    # straight (light knee bend); rear legs fold deeply toward the body.
+    # Engaged via service `/sit`. Released via `/release`.
+    # Values verified via fk_leg against the URDF: front feet drop ~4.4 cm
+    # below stand (straight); rear feet rise ~7.5 cm toward body (tucked under
+    # but still 3.7 cm below body Z=0). Aggressive rear folds (knee < -1.0)
+    # flip the foot ABOVE the body and collide thigh-with-shank — see
+    # scripts/sweep_sit_pose.py for the candidate-comparison output.
+    # Live-tunable: ros2 param set /kinematic_node sit_pose_joints "[...]"
+    # then re-call /sit (the handler re-reads the param each call).
     sit_pose_joints:
-      # FL: front-left
+      # FL: front-left (straight, foot drops below stand)
       - 0.0
-      - -0.30
-      - +0.30
+      - -0.20
+      - +0.50
       # FR: front-right
       - 0.0
-      - -0.30
+      - -0.20
+      - +0.50
+      # BL: back-left (knee modestly folded, foot tucked under body)
+      - 0.0
       - +0.30
-      # BL: back-left (folded)
+      - -0.70
+      # BR: back-right
       - 0.0
-      - +1.00
-      - -2.20
-      # BR: back-right (folded)
-      - 0.0
-      - +1.00
-      - -2.20
+      - +0.30
+      - -0.70
     # link_params_yaml + urdf_joints_yaml are injected by the launch file
     # via PathJoinSubstitution (absolute path required at node init time).
