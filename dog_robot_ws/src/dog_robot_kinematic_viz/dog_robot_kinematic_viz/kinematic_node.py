@@ -7,13 +7,14 @@ all 12 joints.
 """
 from __future__ import annotations
 import time
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import rclpy
 from geometry_msgs.msg import Twist
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
+from std_srvs.srv import Trigger
 
 from dog_robot_kinematics.kinematics_link import load_link_params, fk_leg
 from visualization_msgs.msg import MarkerArray
@@ -56,6 +57,14 @@ class KinematicNode(Node):
         self.declare_parameter("body_z_max", +0.03)
         self.declare_parameter("pitch_min", -0.05)
         self.declare_parameter("pitch_max", +0.05)
+        self.declare_parameter(
+            "sit_pose_joints",
+            [
+                0.0, -0.30, +0.30,   # FL
+                0.0, -0.30, +0.30,   # FR
+                0.0, +1.00, -2.20,   # BL
+                0.0, +1.00, -2.20,   # BR
+            ])
         self.declare_parameter("foot_trail_max_points", 300)
 
         publish_rate = float(self.get_parameter("publish_rate").value)
@@ -74,6 +83,14 @@ class KinematicNode(Node):
         if len(idle) != 3:
             raise ValueError(f"idle_joints must have 3 entries, got {idle}")
         self._idle = tuple(float(x) for x in idle)
+
+        sit_pose = list(self.get_parameter("sit_pose_joints").value)
+        if len(sit_pose) != 12:
+            raise ValueError(
+                f"sit_pose_joints must have 12 entries (3 per leg × 4 legs), "
+                f"got {len(sit_pose)}")
+        self._sit_pose_joints: Tuple[float, ...] = tuple(float(x) for x in sit_pose)
+        self._locked_joints: Optional[Tuple[float, ...]] = None
 
         ft_params = FootTargetParams(
             stride_per_mps=float(self.get_parameter("stride_per_mps").value),
@@ -121,15 +138,54 @@ class KinematicNode(Node):
             f"kinematic_node up: legs={active}, idle={idle}, "
             f"rate={publish_rate} Hz, step_freq={ft_params.stride_per_mps}")
 
+        self._sit_srv = self.create_service(Trigger, "/sit", self._on_sit)
+        self._release_srv = self.create_service(Trigger, "/release", self._on_release)
+
     def _on_cmd_vel(self, msg: Twist) -> None:
         self.commander.on_cmd_vel(
             msg.linear.x, msg.linear.y, msg.linear.z,
             msg.angular.y, msg.angular.z)
 
+    def _on_sit(self, request, response):
+        self._locked_joints = self._sit_pose_joints
+        self.get_logger().info("pose lock: /sit engaged")
+        response.success = True
+        response.message = "sit pose locked"
+        return response
+
+    def _on_release(self, request, response):
+        was_locked = self._locked_joints is not None
+        self._locked_joints = None
+        # Reset _t_last so the first post-release tick sees a small dt,
+        # avoiding a one-frame gait-phase jump.
+        self._t_last = time.monotonic()
+        self.get_logger().info("pose lock: /release engaged")
+        response.success = True
+        response.message = "lock released" if was_locked else "was not locked (no-op)"
+        return response
+
     def _tick(self) -> None:
         now = time.monotonic()
         dt = now - self._t_last
         self._t_last = now
+
+        if self._locked_joints is not None:
+            stamp = self.get_clock().now().to_msg()
+            js = JointState()
+            js.header.stamp = stamp
+            js.name = self._joint_names
+            js.position = list(self._locked_joints)
+            self._pub.publish(js)
+            # Re-publish existing foot trails so RViz keeps them on screen,
+            # but do not append (would inject a flat segment at the locked pose).
+            trail_msg = MarkerArray()
+            for idx, leg in enumerate(LEG_NAMES):
+                trail_msg.markers.append(
+                    build_marker(self._trails[leg], frame_id="base_link",
+                                 marker_id=idx, stamp=stamp))
+            self._trail_pub.publish(trail_msg)
+            return
+
         self.commander.tick(dt)
 
         v_xy = self.commander.body_vel_xy()

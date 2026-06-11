@@ -337,3 +337,180 @@ def test_only_bl_br_drivers_are_rear(rclpy_ctx):
     assert node.drivers["BL"].is_rear is True
     assert node.drivers["BR"].is_rear is True
     node.destroy_node()
+
+
+# --- /sit, /release named-pose API ---
+
+from std_srvs.srv import Trigger    # noqa: E402
+
+
+SIT_JOINTS_TEST = (
+    0.0, -0.30, +0.30,
+    0.0, -0.30, +0.30,
+    0.0, +1.00, -2.20,
+    0.0, +1.00, -2.20,
+)
+
+
+def _call_trigger(client, ex, timeout=2.0):
+    """Call a Trigger service and return the response."""
+    req = Trigger.Request()
+    future = client.call_async(req)
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < timeout:
+        ex.spin_once(timeout_sec=0.05)
+        if future.done():
+            return future.result()
+    raise TimeoutError("Trigger service call did not complete")
+
+
+def test_sit_pose_joints_param_validation(rclpy_ctx):
+    # Wrong length must fail fast at construction.
+    with pytest.raises(ValueError, match="sit_pose_joints"):
+        KinematicNode(parameter_overrides=_overrides(
+            sit_pose_joints=[1.0, 2.0, 3.0]))
+
+
+def test_sit_locks_joints_to_yaml_values(rclpy_ctx):
+    node = KinematicNode(parameter_overrides=_overrides(
+        sit_pose_joints=list(SIT_JOINTS_TEST)))
+
+    listener = rclpy.create_node("sit_listener")
+    received: list[JointState] = []
+    listener.create_subscription(
+        JointState, "/joint_states", lambda m: received.append(m), 10)
+
+    sit_client = listener.create_client(Trigger, "/sit")
+
+    ex = SingleThreadedExecutor()
+    ex.add_node(node)
+    ex.add_node(listener)
+
+    # Wait for service to advertise.
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 1.0 and not sit_client.service_is_ready():
+        ex.spin_once(timeout_sec=0.02)
+    assert sit_client.service_is_ready(), "/sit service did not advertise"
+
+    resp = _call_trigger(sit_client, ex)
+    assert resp.success is True
+    assert "sit pose locked" in resp.message
+
+    # Spin a few ticks; every subsequent /joint_states must match the locked tuple.
+    received.clear()
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 0.3:
+        ex.spin_once(timeout_sec=0.02)
+
+    assert received, "no /joint_states received after /sit"
+    for msg in received[-3:]:   # check the last few
+        for i, expected in enumerate(SIT_JOINTS_TEST):
+            assert msg.position[i] == pytest.approx(expected, abs=1e-9), (
+                f"joint {i} = {msg.position[i]} != {expected} after /sit")
+
+    node.destroy_node()
+    listener.destroy_node()
+
+
+def test_release_resumes_dynamic_control(rclpy_ctx):
+    node = KinematicNode(parameter_overrides=_overrides(
+        sit_pose_joints=list(SIT_JOINTS_TEST), step_freq=0.0))
+
+    listener = rclpy.create_node("release_listener")
+    received: list[JointState] = []
+    listener.create_subscription(
+        JointState, "/joint_states", lambda m: received.append(m), 10)
+
+    publisher = rclpy.create_node("release_publisher")
+    pub = publisher.create_publisher(Twist, "/cmd_vel", 10)
+
+    sit_client = listener.create_client(Trigger, "/sit")
+    release_client = listener.create_client(Trigger, "/release")
+
+    ex = SingleThreadedExecutor()
+    for n in (node, listener, publisher):
+        ex.add_node(n)
+
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 1.0 and not (
+            sit_client.service_is_ready() and release_client.service_is_ready()):
+        ex.spin_once(timeout_sec=0.02)
+
+    _call_trigger(sit_client, ex)
+
+    # While locked, confirm joints == SIT_JOINTS_TEST.
+    received.clear()
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 0.2:
+        ex.spin_once(timeout_sec=0.02)
+    locked_snapshot = list(received[-1].position)
+    for i, expected in enumerate(SIT_JOINTS_TEST):
+        assert locked_snapshot[i] == pytest.approx(expected, abs=1e-9)
+
+    # Release and start pushing cmd_vel.linear.z so body_z grows.
+    _call_trigger(release_client, ex)
+
+    twist = Twist()
+    twist.linear.z = 0.04
+    received.clear()
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 0.6:
+        pub.publish(twist)
+        ex.spin_once(timeout_sec=0.02)
+    post = list(received[-1].position)
+
+    # Dynamic control resumed → at least one joint should differ from the
+    # locked snapshot.
+    max_delta = max(abs(post[i] - locked_snapshot[i]) for i in range(12))
+    assert max_delta > 1e-3, (
+        f"after /release + cmd_vel, joints unchanged (max delta={max_delta})")
+
+    node.destroy_node()
+    listener.destroy_node()
+    publisher.destroy_node()
+
+
+def test_cmd_vel_during_lock_does_not_change_joints(rclpy_ctx):
+    node = KinematicNode(parameter_overrides=_overrides(
+        sit_pose_joints=list(SIT_JOINTS_TEST), step_freq=0.0))
+
+    listener = rclpy.create_node("lock_cmd_listener")
+    received: list[JointState] = []
+    listener.create_subscription(
+        JointState, "/joint_states", lambda m: received.append(m), 10)
+
+    publisher = rclpy.create_node("lock_cmd_publisher")
+    pub = publisher.create_publisher(Twist, "/cmd_vel", 10)
+
+    sit_client = listener.create_client(Trigger, "/sit")
+
+    ex = SingleThreadedExecutor()
+    for n in (node, listener, publisher):
+        ex.add_node(n)
+
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 1.0 and not sit_client.service_is_ready():
+        ex.spin_once(timeout_sec=0.02)
+
+    _call_trigger(sit_client, ex)
+
+    # Drive cmd_vel for 0.5 s; joints must stay byte-identical to SIT_JOINTS_TEST.
+    twist = Twist()
+    twist.linear.x = 0.10
+    twist.linear.z = 0.04
+    twist.angular.y = 0.04
+    received.clear()
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 0.5:
+        pub.publish(twist)
+        ex.spin_once(timeout_sec=0.02)
+
+    assert received, "no /joint_states during locked cmd_vel"
+    for msg in received[-5:]:
+        for i, expected in enumerate(SIT_JOINTS_TEST):
+            assert msg.position[i] == pytest.approx(expected, abs=1e-9), (
+                f"joint {i} = {msg.position[i]} != {expected} during lock")
+
+    node.destroy_node()
+    listener.destroy_node()
+    publisher.destroy_node()

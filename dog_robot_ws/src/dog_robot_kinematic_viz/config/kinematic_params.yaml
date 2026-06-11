@@ -9,5 +9,25 @@ kinematic_node:
     stance_phase_ratio: 0.5
     pitch_min: -0.05
     pitch_max: +0.05
+    # Sit-pose joint snapshot (12 floats in FL/FR/BL/BR × hip_roll/thigh_pitch/knee_pitch order).
+    # Engaged via service `/sit`. Released via `/release`. Front legs stay near
+    # straight (light knee bend); rear legs fold deeply toward the body.
+    sit_pose_joints:
+      # FL: front-left
+      - 0.0
+      - -0.30
+      - +0.30
+      # FR: front-right
+      - 0.0
+      - -0.30
+      - +0.30
+      # BL: back-left (folded)
+      - 0.0
+      - +1.00
+      - -2.20
+      # BR: back-right (folded)
+      - 0.0
+      - +1.00
+      - -2.20
     # link_params_yaml + urdf_joints_yaml are injected by the launch file
     # via PathJoinSubstitution (absolute path required at node init time).
