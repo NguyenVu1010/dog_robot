@@ -200,13 +200,21 @@ class KinematicNode(Node):
         self.commander.tick(dt)
 
         v_xy = self.commander.body_vel_xy()
+        wz = self.commander.body_yaw_rate()
         bz = self.commander.body_z()
         pitch = self.commander.pitch_amount()
         positions: List[float] = []
         for leg in LEG_NAMES:
             if leg in self.drivers:
-                q = self.drivers[leg].step(
-                    v_xy, self.commander.phase(leg), bz, pitch)
+                driver = self.drivers[leg]
+                # Per-leg effective body velocity: translational + tangent
+                # contribution from yaw at the hip's body-XY position.
+                hip_xy = driver.geom.base_to_hip_xyz[:2]
+                v_eff = (
+                    v_xy[0] - wz * hip_xy[1],
+                    v_xy[1] + wz * hip_xy[0],
+                )
+                q = driver.step(v_eff, self.commander.phase(leg), bz, pitch)
             else:
                 q = self._idle
             positions.extend(float(x) for x in q)

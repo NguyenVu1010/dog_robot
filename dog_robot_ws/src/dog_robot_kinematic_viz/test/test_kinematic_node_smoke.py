@@ -470,6 +470,56 @@ def test_release_resumes_dynamic_control(rclpy_ctx):
     publisher.destroy_node()
 
 
+def test_angular_z_drives_all_four_legs_via_tangent_velocity(rclpy_ctx):
+    # step_freq=0.0 freezes the gait clock so only the yaw tangent
+    # velocity moves joints (no body_z, no pitch).
+    node = KinematicNode(parameter_overrides=_overrides(step_freq=0.0))
+
+    listener = rclpy.create_node("yaw_listener")
+    received: list[JointState] = []
+    listener.create_subscription(
+        JointState, "/joint_states", lambda m: received.append(m), 10)
+
+    publisher = rclpy.create_node("yaw_publisher")
+    pub = publisher.create_publisher(Twist, "/cmd_vel", 10)
+
+    ex = SingleThreadedExecutor()
+    for n in (node, listener, publisher):
+        ex.add_node(n)
+
+    # Warm-up baseline at all-zero input.
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 0.4:
+        ex.spin_once(timeout_sec=0.02)
+    assert received, "no /joint_states received during yaw warm-up"
+    snapshot_pre = list(received[-1].position)
+
+    # Drive angular.z = +0.5 rad/s for ~0.6 s.
+    twist = Twist()
+    twist.angular.z = 0.5
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 0.6:
+        pub.publish(twist)
+        ex.spin_once(timeout_sec=0.02)
+    snapshot_post = list(received[-1].position)
+
+    # All four legs should respond — each gets a different tangent velocity
+    # because each hip is at a different XY position in the body frame.
+    # Joint layout: FL[0..3) FR[3..6) BL[6..9) BR[9..12).
+    for leg_idx, leg_name in enumerate(("FL", "FR", "BL", "BR")):
+        start = leg_idx * 3
+        end = start + 3
+        leg_delta = max(
+            abs(snapshot_post[i] - snapshot_pre[i]) for i in range(start, end))
+        assert leg_delta > 1e-3, (
+            f"{leg_name} joints did not respond to angular.z "
+            f"(max delta={leg_delta})")
+
+    node.destroy_node()
+    listener.destroy_node()
+    publisher.destroy_node()
+
+
 def test_cmd_vel_during_lock_does_not_change_joints(rclpy_ctx):
     node = KinematicNode(parameter_overrides=_overrides(
         sit_pose_joints=list(SIT_JOINTS_TEST), step_freq=0.0))
