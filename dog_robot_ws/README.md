@@ -9,64 +9,58 @@ ROS 2 workspace for a 12-DOF quadruped robot.
 | `dog_robot_description` | ament_python | URDF/xacro, meshes, ros2_controllers.yaml |
 | `dog_robot_kinematics` | ament_python | Pure-Python DH FK/IK + leg config (no ROS deps) |
 | `dog_robot_control` | ament_python | walker / stand controllers, gait engine, teleop |
-| `dog_robot_kinematic_viz` | ament_cmake | Gazebo-free RViz rig (launch + rviz config only) |
+| `dog_robot_kinematic_viz` | ament_cmake | Gazebo-free RViz rig (launch + rviz config; reuses walker for IK) |
 | `dog_robot_config` | ament_cmake | CHAMP-era config (legacy) |
 
 ## Kinematics
 
-The dog_robot uses Modified Denavit-Hartenberg (Craig) convention. Each leg is a
-3-DOF chain (hip yaw, thigh pitch, knee pitch). One symmetric DH table covers
-all four legs; per-leg variation lives in the base→hip fixed transform.
+Each leg is a 3-DOF chain (hip roll, thigh pitch, knee pitch) modelled as a
+sequence of fixed parent→child joint transforms (translation + rpy rotation)
+each followed by a revolute Z rotation at that joint. Front and back legs use
+distinct transforms (different CAD geometry), stored verbatim per leg —
+nothing is averaged.
 
 ### Frames
 
 - **Body B** — URDF root `base_link` (X forward, Y left, Z up).
-- **Hip H_<leg>** — fixed transform per leg; Z_H along the hip yaw axis (= body
-  X), X_H downward (= -body Z).
-- **DH frames 1-3** — at each joint, Z along that joint's axis.
+- **Hip H_<leg>** — fixed `base_link → <leg>_hip_yaw` joint transform.
+- **Thigh / Shank / Foot** — each at the parent joint's location; Z along that
+  joint's revolute axis.
 
-### DH Table
+### Source of truth
 
-| i | α_{i-1} | a_{i-1}            | d_i | θ_i      |
-|---|---------|---------------------|-----|----------|
-| 1 | 0       | 0                  | 0   | θ_hip    |
-| 2 | -π/2    | L_hh = 0.02553 m   | 0   | θ_thigh  |
-| 3 | 0       | L_th = 0.11725 m   | 0   | θ_knee   |
-| F | 0       | L_sh = 0.07043 m   | 0   | 0        |
+`src/dog_robot_description/config/link_params.yaml` is auto-generated from
+CAD by `src/dog_robot_description/scripts/derive_joint_frames.py`. It holds:
 
-Lengths come from `src/dog_robot_description/scripts/compute_dh_lengths.py`,
-which averages the four legs' CAD measurements.
+- Scalar gait lengths `L_hh`, `L_th`, `L_sh` (full joint-to-joint distances).
+- For each leg (FL/FR/BL/BR), three `(xyz, rpy)` blocks:
+  `hip_to_thigh`, `thigh_to_knee`, `knee_to_foot`. Each is the rigid transform
+  in the parent joint's frame, with Z aligned to the parent joint's axis.
+
+The URDF macro and the kinematics module both read this YAML, so FK/IK and
+the rendered model stay in lock-step.
 
 ### Forward kinematics
 
 ```python
-from dog_robot_kinematics import DHParams, fk_leg
-dh = DHParams(L_hh=0.02553, L_th=0.11725, L_sh=0.07043)
-foot_xyz = fk_leg(dh, (theta_hip, theta_thigh, theta_knee))
+from dog_robot_kinematics import load_link_params, fk_leg
+lp = load_link_params("install/dog_robot_description/share/.../link_params.yaml", "FL")
+foot_xyz_in_hip = fk_leg(lp, (theta_hip, theta_thigh, theta_knee))
 ```
+
+`fk_leg` composes 6 transforms (3 fixed × 3 revolute-Z) in the hip frame.
 
 ### Inverse kinematics
 
 ```python
 from dog_robot_kinematics import ik_leg
-theta_hip, theta_thigh, theta_knee = ik_leg(dh, foot_xyz_in_hip_frame,
-                                            knee_direction=+1)
+theta_hip, theta_thigh, theta_knee = ik_leg(lp, foot_xyz_in_hip,
+                                            knee_branch=+1)
 ```
 
-Closed-form 2R planar + hip yaw decomposition. Raises `ValueError` for foot
-targets on the hip yaw axis or beyond reach.
-
-### Per-leg base→hip transforms
-
-| Leg | base→hip xyz (m)            | base→hip rpy (rad)    | Mirror |
-|-----|------------------------------|------------------------|--------|
-| FL  | ( 0.0748,  0.0400, 0.0351)  | (0, π/2, 0)           | +1     |
-| FR  | ( 0.0748, -0.0400, 0.0351)  | (0, π/2, π)           | -1     |
-| BL  | (-0.0748,  0.0400, 0.0351)  | (0, π/2, 0)           | +1     |
-| BR  | (-0.0748, -0.0400, 0.0351)  | (0, π/2, π)           | -1     |
-
-The right-side `π` yaw places right legs on the opposite side of body Y while
-keeping the same DH table — IK and FK code is identical for all four legs.
+Closed-form: hip yaw from foot projection onto the hip plane, then 2R planar
+solve in the thigh/shank plane. Raises `ValueError` for foot targets on the
+hip axis or beyond reach.
 
 ### Verification
 
@@ -74,8 +68,8 @@ keeping the same DH table — IK and FK code is identical for all four legs.
 python3 -m pytest src/dog_robot_kinematics/test/
 ```
 
-Tests check FK/IK roundtrip (200 random configs) and URDF chain ↔ kinematics
-module agreement on 40 random joint angle sets across all four legs.
+Tests cover: FK/IK roundtrip (random configs), URDF chain ↔ `fk_leg`
+agreement across all four legs, and the `knee_branch` sign convention.
 
 ## Kinematic-only visualization (no Gazebo)
 
@@ -191,6 +185,20 @@ build path for ament_python packages. The workaround used here:
 `scripts/dog_kill_all.sh` is the SIGTERM→SIGKILL fallback for orphan
 `gzserver`/`controller_node`/`walker_controller` processes; always run it
 before relaunching to avoid the next launch hanging on a wedged orphan.
+
+### Spawn pose
+
+`ros2_control.xacro` sets each joint's `initial_value` to the bent stand pose
+(`thigh=-0.4146`, `knee=1.1498`) so the plugin reports that pose at Load()
+before the first physics tick. Both launch files spawn the body at `z=0.16`,
+which puts the feet ~10 mm above the ground for a gentle settle. Spawning
+straight legs at `z=0.18` instead pushed the foot 18 mm into the ground at
+boot, triggering a 360 N contact impulse that exploded the robot.
+
+The `dog_robot_kinematic_viz` RViz config lives in
+`src/dog_robot_kinematic_viz/rviz/kinematic.rviz`. Both `kinematic.launch.py`
+and `kinematic_teleop.launch.py` load it from that package (previously they
+referenced an old copy under `dog_robot_control/rviz/`).
 
 ## Stand controller (deprecated)
 

@@ -44,13 +44,13 @@ def generate_launch_description():
         output="screen",
     )
 
-    # Spawn just above the fully-extended leg height (foot touches ground
-    # immediately at zero joint angles). No free-fall impact.
+    # Initial joint pose is the bent stand pose (set in ros2_control.xacro),
+    # so spawn at body z=0.16 puts feet ~10 mm above ground => tiny settle.
     spawn = Node(
         package="gazebo_ros",
         executable="spawn_entity.py",
         arguments=["-topic", "robot_description", "-entity", "dog_robot",
-                   "-z", "0.18", "-timeout", "120"],
+                   "-z", "0.16", "-timeout", "120"],
         output="screen",
     )
 

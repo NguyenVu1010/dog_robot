@@ -13,11 +13,12 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     descr = FindPackageShare("dog_robot_description")
     ctrl = FindPackageShare("dog_robot_control")
+    viz = FindPackageShare("dog_robot_kinematic_viz")
 
     urdf_xacro = PathJoinSubstitution([descr, "urdf", "dog_robot.urdf.xacro"])
     controllers_yaml = PathJoinSubstitution([descr, "config", "ros2_controllers.yaml"])
     walker_params = PathJoinSubstitution([ctrl, "config", "walker_params.yaml"])
-    rviz_cfg = PathJoinSubstitution([ctrl, "rviz", "kinematic.rviz"])
+    rviz_cfg = PathJoinSubstitution([viz, "rviz", "kinematic.rviz"])
 
     robot_description = {
         "robot_description": Command([

@@ -44,15 +44,16 @@ def generate_launch_description():
         output="screen",
     )
 
-    # Spawn just above the fully-extended leg height (hip_z=0.035 +
-    # L_total=0.213 = 0.248). At z=0.18, foot at zero joint angles touches
-    # ground immediately (0.18 + 0.035 - 0.213 ≈ 0). No free-fall impact;
-    # walker_controller then ramps legs into the bent stand pose.
+    # Initial joint pose in ros2_control.xacro is the BENT stand pose
+    # (thigh=-0.4146, knee=1.1498), so spawn at body z=0.16 puts feet
+    # ~10 mm above ground => tiny settle, no contact impulse.
+    # (Spawning at z=0.18 with theta=0 legs put foot center at z=-0.0003
+    # i.e. 18 mm of sphere penetration => 360 N upward => robot exploded.)
     spawn = Node(
         package="gazebo_ros",
         executable="spawn_entity.py",
         arguments=["-topic", "robot_description", "-entity", "dog_robot",
-                   "-z", "0.18", "-timeout", "120"],
+                   "-z", "0.16", "-timeout", "120"],
         output="screen",
     )
 
