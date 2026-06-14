@@ -1,72 +1,61 @@
 # dog_robot_ws
 
-ROS 2 workspace for a 12-DOF quadruped robot.
+ROS 2 workspace for a 12-DOF quadruped robot — kinematic-only branch. No
+Gazebo / no `ros2_control`: `/cmd_vel` drives a Python gait + closed-form IK
+that publishes `/joint_states` straight to `robot_state_publisher` for RViz.
 
 ## Packages
 
 | Package | Build | Role |
 |---|---|---|
-| `dog_robot_description` | ament_python | URDF/xacro, meshes, ros2_controllers.yaml |
-| `dog_robot_kinematics` | ament_python | Pure-Python DH FK/IK + leg config (no ROS deps) |
-| `dog_robot_control` | ament_python | walker / stand controllers, gait engine, teleop |
-| `dog_robot_kinematic_viz` | ament_cmake | Gazebo-free RViz rig (launch + rviz config only) |
-| `dog_robot_config` | ament_cmake | CHAMP-era config (legacy) |
+| `dog_robot_description` | ament_cmake | URDF/xacro, meshes, `link_params.yaml`, `urdf_joints.yaml` |
+| `dog_robot_kinematics` | ament_python | Pure-Python link-frame FK/IK (no ROS deps) |
+| `dog_robot_kinematic_viz` | ament_python | Gait engine, ROS node, teleop, GUI, launch files, RViz config |
+
+Gazebo / `ros2_control` / `dog_robot_control` / CHAMP config were stripped
+in commit `c91f043`. This branch is the kinematic rig only.
 
 ## Kinematics
 
-The dog_robot uses Modified Denavit-Hartenberg (Craig) convention. Each leg is a
-3-DOF chain (hip yaw, thigh pitch, knee pitch). One symmetric DH table covers
-all four legs; per-leg variation lives in the base→hip fixed transform.
+Each leg is a 3-DOF chain (hip roll, thigh pitch, knee pitch) modelled as a
+sequence of fixed parent→child joint transforms (translation + rpy rotation)
+each followed by a revolute Z rotation at that joint. Front and back legs use
+distinct transforms (different CAD geometry), stored verbatim per leg —
+nothing is averaged.
 
 ### Frames
 
 - **Body B** — URDF root `base_link` (X forward, Y left, Z up).
-- **Hip H_<leg>** — fixed transform per leg; Z_H along the hip yaw axis (= body
-  X), X_H downward (= -body Z).
-- **DH frames 1-3** — at each joint, Z along that joint's axis.
+- **Hip H_<leg>** — fixed `base_link → <leg>_hip_roll` joint transform.
+- **Thigh / Shank / Foot** — each at the parent joint's location; Z along that
+  joint's revolute axis.
 
-### DH Table
+### Source of truth
 
-| i | α_{i-1} | a_{i-1}            | d_i | θ_i      |
-|---|---------|---------------------|-----|----------|
-| 1 | 0       | 0                  | 0   | θ_hip    |
-| 2 | -π/2    | L_hh = 0.02553 m   | 0   | θ_thigh  |
-| 3 | 0       | L_th = 0.11725 m   | 0   | θ_knee   |
-| F | 0       | L_sh = 0.07043 m   | 0   | 0        |
+`src/dog_robot_description/config/link_params.yaml` is auto-generated from
+CAD by `src/dog_robot_description/scripts/derive_joint_frames.py`. It holds:
 
-Lengths come from `src/dog_robot_description/scripts/compute_dh_lengths.py`,
-which averages the four legs' CAD measurements.
+- Scalar gait lengths `L_hh`, `L_th`, `L_sh` (full joint-to-joint distances).
+- For each leg (FL/FR/BL/BR), three `(xyz, rpy)` blocks:
+  `hip_to_thigh`, `thigh_to_knee`, `knee_to_foot`. Each is the rigid transform
+  in the parent joint's frame, with Z aligned to the parent joint's axis.
 
-### Forward kinematics
+The URDF macro and the kinematics module both read this YAML, so FK/IK and
+the rendered model stay in lock-step.
 
-```python
-from dog_robot_kinematics import DHParams, fk_leg
-dh = DHParams(L_hh=0.02553, L_th=0.11725, L_sh=0.07043)
-foot_xyz = fk_leg(dh, (theta_hip, theta_thigh, theta_knee))
-```
-
-### Inverse kinematics
+### Forward / inverse kinematics
 
 ```python
-from dog_robot_kinematics import ik_leg
-theta_hip, theta_thigh, theta_knee = ik_leg(dh, foot_xyz_in_hip_frame,
-                                            knee_direction=+1)
+from dog_robot_kinematics import load_link_params, fk_leg, ik_leg
+lp = load_link_params("install/dog_robot_description/share/.../link_params.yaml", "FL")
+foot_xyz_in_hip = fk_leg(lp, (theta_hip, theta_thigh, theta_knee))
+theta_hip, theta_thigh, theta_knee = ik_leg(lp, foot_xyz_in_hip, knee_branch=+1)
 ```
 
-Closed-form 2R planar + hip yaw decomposition. Raises `ValueError` for foot
-targets on the hip yaw axis or beyond reach.
-
-### Per-leg base→hip transforms
-
-| Leg | base→hip xyz (m)            | base→hip rpy (rad)    | Mirror |
-|-----|------------------------------|------------------------|--------|
-| FL  | ( 0.0748,  0.0400, 0.0351)  | (0, π/2, 0)           | +1     |
-| FR  | ( 0.0748, -0.0400, 0.0351)  | (0, π/2, π)           | -1     |
-| BL  | (-0.0748,  0.0400, 0.0351)  | (0, π/2, 0)           | +1     |
-| BR  | (-0.0748, -0.0400, 0.0351)  | (0, π/2, π)           | -1     |
-
-The right-side `π` yaw places right legs on the opposite side of body Y while
-keeping the same DH table — IK and FK code is identical for all four legs.
+`fk_leg` composes 6 transforms (3 fixed × 3 revolute-Z) in the hip frame.
+`ik_leg` is closed-form: hip yaw from foot projection onto the hip plane,
+then 2R planar solve in the thigh/shank plane. Raises `ValueError` for foot
+targets on the hip axis or beyond reach.
 
 ### Verification
 
@@ -74,126 +63,155 @@ keeping the same DH table — IK and FK code is identical for all four legs.
 python3 -m pytest src/dog_robot_kinematics/test/
 ```
 
-Tests check FK/IK roundtrip (200 random configs) and URDF chain ↔ kinematics
-module agreement on 40 random joint angle sets across all four legs.
+Covers FK/IK roundtrip, URDF chain ↔ `fk_leg` agreement across all four legs,
+and the `knee_branch` sign convention.
 
-## Kinematic-only visualization (no Gazebo)
-
-`dog_robot_kinematic_viz` is the Gazebo-free debugging rig. cmd_vel drives the
-full gait + IK pipeline; joint angles render straight in RViz.
+## Kinematic rig
 
 ```
-              /cmd_vel
-                 │
-                 ▼
-       walker_controller (kinematic_mode=True)
-                 │
-                 ▼  /joint_states (50 Hz)
-       robot_state_publisher ──→ /tf
-                                    │
-                                    ▼
-                                  RViz
+                  /cmd_vel  (5 axes — see Twist map below)
+                     │
+                     ▼
+       BodyCommander   ──→  body_z / pitch_amount state
+                     │              │
+                     ▼              ▼
+       FootTarget   per leg     extra_z input
+                     │
+                     ▼
+       LegDriver    ──→  ik_leg  ──→  JointState
+                     │
+                     ▼  /joint_states (50 Hz)            /foot_trails
+       robot_state_publisher ──→ /tf  ─────────────────→  RViz
 ```
 
-No `gzserver`, no `ros2_control_node`, no JTC. Walker publishes `JointState`
-directly when `kinematic_mode=True`.
+`KinematicNode` (`src/dog_robot_kinematic_viz/.../kinematic_node.py`) owns
+the timer, services, and publishers. Inactive legs (those not in
+`active_legs`) publish `idle_joints` every tick so RViz always sees 12 joints.
 
-### Run
+### Launch modes
+
+| Launch file | Adds on top of base (RSP + static_tf + KinematicNode + RViz) |
+|---|---|
+| `kinematic.launch.py` | nothing — publish `/cmd_vel` yourself |
+| `kinematic_teleop.launch.py` | keyboard teleop in a new `gnome-terminal` |
+| `kinematic_gui.launch.py` | Tk window with 5 sliders + Sit/Release buttons |
+| `kinematic_single_leg.launch.py` | single-leg debug (`active_legs:=[FL]` etc.) |
+
+The base is anchored at a static `world → base_link` transform — no physics.
+`base_height` launch arg sets the anchor Z (default 0.20 m).
+
+### One-shot run
 
 ```bash
 ./scripts/dog_relaunch_kinematic.sh
 ```
 
-The script kills stale processes, rebuilds, and launches
-`dog_robot_kinematic_viz/kinematic_teleop.launch.py` (RSP + walker + teleop +
-RViz). The teleop opens its own `gnome-terminal` window — WASD/JL keys publish
-`/cmd_vel` at 10 Hz continuously (so walker's 0.5 s cmd_vel timeout never
-fires mid-key-hold).
+Kills stale processes, `colcon build --packages-select` the three packages,
+sources `install/`, then `ros2 launch dog_robot_kinematic_viz
+kinematic_teleop.launch.py`. Use `dog_kill_all.sh` standalone if a previous
+run leaves `kinematic_node`/`rviz2`/`gnome-terminal` orphaned.
 
-Bare RViz without teleop:
+### `/cmd_vel` Twist map
+
+The node consumes five axes:
+
+| Axis | Effect | Default range |
+|---|---|---|
+| `linear.x` | trot forward / back (m/s) | uncapped at node; teleop caps ±0.20 |
+| `linear.y` | trot strafe left / right (m/s) | same |
+| `linear.z` | body-height velocity (m/s) — integrated into `body_z` | clamped to `[body_z_min, body_z_max]` (default ±0.03 m) |
+| `angular.y` | pitch / rear-fold velocity (rad/s) — integrated into `pitch_amount` | clamped to `[pitch_min, pitch_max]` (default ±0.05) |
+| `angular.z` | yaw rate (rad/s) — adds per-leg tangential foot velocity | uncapped at node; teleop caps ±0.80 |
+
+`pitch_amount` is the continuous rear-fold input that pairs with the
+`/sit` pose: each leg's foot-Z offset is sign-flipped per leg so the rear
+folds while the front holds, giving a smooth sit / unsit transition.
+
+Stop publishing → 0.5 s timeout → all five inputs decay to zero (gait halts
+in place; `body_z` / `pitch_amount` integrated state is held).
+
+### Named-pose API: `/sit` and `/release`
+
+Two `std_srvs/Trigger` services lock the joints to a fixed snapshot:
 
 ```bash
-ros2 launch dog_robot_kinematic_viz kinematic.launch.py
-# in a separate terminal:
-ros2 topic pub /cmd_vel geometry_msgs/Twist '{linear: {x: 0.1}}' -r 10
+ros2 service call /sit     std_srvs/srv/Trigger {}
+ros2 service call /release std_srvs/srv/Trigger {}
 ```
 
-### Teleop keymap
+While sit is engaged, gait + `/cmd_vel` are bypassed and `KinematicNode`
+publishes the 12 joints in `sit_pose_joints` directly. `/release` returns
+control to the gait engine.
+
+The sit pose is hot-tunable via parameter:
+
+```bash
+ros2 param set /kinematic_node sit_pose_joints \
+  "[0.0,-0.20,0.50, 0.0,-0.20,0.50, 0.0,0.30,-0.70, 0.0,0.30,-0.70]"
+ros2 service call /sit std_srvs/srv/Trigger {}   # handler re-reads the param
+```
+
+Order is FL/FR/BL/BR × `hip_roll, thigh_pitch, knee_pitch`. Default values
+live in `src/dog_robot_kinematic_viz/config/kinematic_params.yaml`. The
+header comment there documents the safe range and the
+`scripts/sweep_sit_pose.py` candidate-comparison output that was used to
+pick them.
+
+### Keyboard teleop keymap
+
+`kinematic_teleop.launch.py` spawns `teleop_keyboard` inside its own
+`gnome-terminal` (so it has a real TTY for raw-mode reads). All keys
+publish a fresh `/cmd_vel` immediately on press:
 
 | Key | Action |
 |---|---|
-| `w` / `s` | linear.x ± 0.02 m/s (cap 0.15) |
-| `a` / `d` | linear.y ± 0.02 m/s (cap 0.15) |
-| `j` / `l` | angular.z ± 0.05 rad/s (cap 0.50) |
-| space | zero all velocities |
-| `x` or Ctrl-C | quit |
+| `w` / `s` | `linear.x` ± 0.02 m/s (cap ±0.20) |
+| `a` / `d` | `linear.y` ± 0.02 m/s (cap ±0.20) |
+| `r` / `f` | `linear.z` ± 0.02 m/s (cap ±0.20) — body up / down |
+| `i` / `k` | `angular.y` ± 0.02 rad/s (cap ±0.20) — sit / unsit |
+| `j` / `l` | `angular.z` ± 0.10 rad/s (cap ±0.80) — yaw |
+| space | zero all five axes |
+| `q` / Ctrl-C | quit |
 
-## Walking (Gazebo)
+### Tk GUI teleop
 
-`walker_controller` is the production controller. Subsumes `stand_controller`:
-when `/cmd_vel` is zero, walker holds the stand pose; non-zero cmd_vel triggers
-a trot gait (Bernstein-Bezier swing + linear stance) computed in Python and
-converted to joint commands via DH IK.
+`kinematic_gui.launch.py` swaps the terminal teleop for a small Tk window
+(`gui_teleop.py`): five sliders (one per axis) plus **Sit** / **Release**
+buttons that call the services above. The window publishes `/cmd_vel` at 50 Hz
+so slider state always matches the topic. Useful when you don't have a
+spare terminal or want to drag axes continuously instead of stepping.
 
-### Run
+### Foot-tip trail
 
-```bash
-./scripts/dog_relaunch_walk.sh
-```
-
-Same script pattern as the kinematic version — wipes build/log, rebuilds
-non-pip packages, then launches `walk.launch.py` (Gazebo + spawn + JTC +
-walker). Robot ramps from the URDF-set stand pose; the spawn position is
-already at stand height so there is no contact impulse at boot.
-
-Then publish cmd_vel:
-
-```bash
-ros2 topic pub /cmd_vel geometry_msgs/Twist '{linear: {x: 0.1}}' -r 10
-```
-
-Twist field map:
-- `linear.x` — forward / backward (m/s), capped at `gait.max_linear_velocity_x`
-- `linear.y` — sideways (m/s)
-- `angular.z` — yaw (rad/s)
-
-Stop publishing or send zeros → 0.5 s timeout → walker decays back to stand.
+`KinematicNode` also publishes `/foot_trails` (`visualization_msgs/MarkerArray`)
+— one LINE_STRIP per leg of recent foot-tip positions. The default RViz
+config (`src/dog_robot_kinematic_viz/rviz/kinematic.rviz`) subscribes to it.
+Max points per leg: `foot_trail_max_points` (default 300).
 
 ### Gait config
 
-`dog_robot_control/config/walker_params.yaml` exposes tunable gait params
-(stance duration, swing height, velocity caps, knee direction, etc.). See
-inline comments in the YAML.
+`src/dog_robot_kinematic_viz/config/kinematic_params.yaml`:
 
-### Architecture
-
-`/cmd_vel` → `BodyController.pose_command` → `LegController.velocity_command`
-(`phase_generator` + `trajectory_planner` per leg) → rotate each foot to its
-DH hip frame → `ik_leg` (from `dog_robot_kinematics`) → `JointTrajectory` →
-joint_trajectory_controller → Gazebo. Python layout:
-`dog_robot_control/dog_robot_control/gait/`.
+- `publish_rate` (Hz)
+- `active_legs` — list of `FL`/`FR`/`BL`/`BR` (subset for single-leg debug)
+- `idle_joints` — joints reported for legs not in `active_legs`
+- `step_freq`, `stride_per_mps`, `swing_height`, `stance_phase_ratio` —
+  trot parameters
+- `body_z_min` / `body_z_max`, `pitch_min` / `pitch_max` — clamp ranges
+  for the integrated state
+- `sit_pose_joints` — 12-float sit snapshot (see above)
 
 ## Build & run notes
 
-Setuptools 81 removed the `--editable` flag, which breaks colcon's default
-build path for ament_python packages. The workaround used here:
-
-- `dog_robot_control` and `dog_robot_kinematics` are installed via
-  `pip install -e <absolute path>`; their `install/` trees are preserved
-  across `colcon build` cycles.
-- The relaunch scripts (`scripts/dog_relaunch_{walk,kinematic}.sh`) wipe
-  `build/`, `log/`, and most of `install/` but keep `install/dog_robot_control`
-  intact, then run `colcon build --packages-skip dog_robot_control
-  dog_robot_kinematics`.
-- Launch + config files under `share/` are file copies (not symlinks), so the
-  scripts rsync them after the build to pick up edits.
+Setuptools 81 removed the `--editable` flag; colcon's symlink/develop path
+for ament_python packages is broken on that version. The relaunch script
+uses **plain copy-install** (`colcon build` with no `--symlink-install`),
+which works fine for ament_python — `console_scripts` and `share/` files
+both install correctly. After editing Python sources, re-run
+`scripts/dog_relaunch_kinematic.sh` (or `colcon build --packages-select
+dog_robot_kinematic_viz` + re-source) to pick up the changes.
 
 `scripts/dog_kill_all.sh` is the SIGTERM→SIGKILL fallback for orphan
-`gzserver`/`controller_node`/`walker_controller` processes; always run it
-before relaunching to avoid the next launch hanging on a wedged orphan.
-
-## Stand controller (deprecated)
-
-`stand_controller` + `stand.launch.py` remain in the tree for reference but
-are deprecated. Use the walker (with cmd_vel=0 → stand pose) or the kinematic
-viz rig instead.
+`kinematic_node` / `rviz2` / `gnome-terminal` / `teleop_keyboard` processes;
+the relaunch script runs it first. Run it standalone if a previous launch
+left RViz wedged.
