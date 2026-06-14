@@ -20,4 +20,4 @@ colcon build --packages-select \
 
 source install/setup.bash
 
-exec ros2 launch dog_robot_kinematic_viz kinematic_teleop.launch.py
+exec ros2 launch dog_robot_kinematic_viz kinematic_gui.launch.py

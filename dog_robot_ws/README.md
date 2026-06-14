@@ -108,8 +108,11 @@ The base is anchored at a static `world → base_link` transform — no physics.
 
 Kills stale processes, `colcon build --packages-select` the three packages,
 sources `install/`, then `ros2 launch dog_robot_kinematic_viz
-kinematic_teleop.launch.py`. Use `dog_kill_all.sh` standalone if a previous
-run leaves `kinematic_node`/`rviz2`/`gnome-terminal` orphaned.
+kinematic_gui.launch.py` (Tk sliders + Sit/Release buttons — the full
+feature set). Swap the launch file at the bottom of the script for one
+of the other modes if you want keyboard / bare / single-leg instead. Use
+`dog_kill_all.sh` standalone if a previous run leaves `kinematic_node` /
+`rviz2` / `gui_teleop` orphaned.
 
 ### `/cmd_vel` Twist map
 
